@@ -9,31 +9,7 @@ if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_WEBHOOK_SECRET) {
   console.warn('Telegram env vars not set');
 }
 
-interface TelegramMessage {
-  update_id: number;
-  message?: {
-    message_id: number;
-    from: {
-      id: number;
-      is_bot: boolean;
-      first_name: string;
-    };
-    chat: {
-      id: number;
-      type: string;
-    };
-    date: number;
-    text?: string;
-    photo?: Array<{
-      file_id: string;
-      file_size: number;
-    }>;
-    document?: {
-      file_id: string;
-      file_size: number;
-    };
-  };
-}
+
 
 function validarWebhook(req: NextRequest): boolean {
   const secretFromHeader = req.headers.get('X-Telegram-Bot-API-Secret-Token') || '';
@@ -58,6 +34,117 @@ async function enviarMensagem(chatId: number, texto: string) {
     text: texto,
     parse_mode: 'HTML',
   });
+}
+
+async function responderCallback(callbackQueryId: string, texto?: string) {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
+  await axios.post(url, {
+    callback_query_id: callbackQueryId,
+    text: texto,
+  });
+}
+
+async function editarMensagem(chatId: number, messageId: number, texto: string) {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`;
+  await axios.post(url, {
+    chat_id: chatId,
+    message_id: messageId,
+    text: texto,
+    parse_mode: 'HTML',
+  });
+}
+
+async function enviarMensagemComBotoes(chatId: number, texto: string, botoes: any) {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  await axios.post(url, {
+    chat_id: chatId,
+    text: texto,
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: botoes
+    }
+  });
+}
+
+const botoesCategorias = (gastoId: string) => [
+  [
+    { text: '🍔 Alimentação', callback_data: `cat_alimentacao_${gastoId}` },
+    { text: '🚗 Transporte', callback_data: `cat_transporte_${gastoId}` }
+  ],
+  [
+    { text: '💊 Saúde', callback_data: `cat_saude_${gastoId}` },
+    { text: '🎮 Diversão', callback_data: `cat_diversao_${gastoId}` }
+  ],
+  [
+    { text: '📦 Outros', callback_data: `cat_outros_${gastoId}` },
+    { text: '❌ Excluir', callback_data: `del_${gastoId}` }
+  ]
+];
+
+async function handleCallbackQuery(callbackQuery: any) {
+  const data = callbackQuery.data || '';
+  const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
+  const callbackQueryId = callbackQuery.id;
+  const supabase = supabaseServer();
+
+  try {
+    if (data.startsWith('cat_')) {
+      const parts = data.split('_');
+      const categoriaKey = parts[1];
+      const gastoId = parts.slice(2).join('_'); // Para garantir chaves uuid normais com hífen
+
+      const categoriasMap: any = {
+        alimentacao: 'alimentação',
+        transporte: 'transporte',
+        saude: 'saúde',
+        diversao: 'diversão',
+        outros: 'outros'
+      };
+
+      const catDb = categoriasMap[categoriaKey] || 'outros';
+
+      // Atualizar no banco
+      const { error: errUpdate } = await supabase
+        .from('gastos_diarios')
+        .update({ categoria: catDb, confirmado: true })
+        .eq('id', gastoId);
+
+      if (errUpdate) throw errUpdate;
+
+      const { data: gasto, error: errFetch } = await supabase
+        .from('gastos_diarios')
+        .select('*')
+        .eq('id', gastoId)
+        .single();
+
+      if (errFetch || !gasto) throw new Error('Gasto não localizado.');
+
+      await responderCallback(callbackQueryId, 'Gasto categorizado e confirmado!');
+      
+      const msgEdit = obterFalaAzula(`😼 Gasto de <b>R$ ${gasto.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no <b>${gasto.estabelecimento}</b> classificado como <b>${catDb}</b> e confirmado! Menos dinheiro para o meu papa...`);
+      await editarMensagem(chatId, messageId, msgEdit);
+
+    } else if (data.startsWith('del_')) {
+      const parts = data.split('_');
+      const gastoId = parts.slice(1).join('_');
+
+      const { error: errDel } = await supabase
+        .from('gastos_diarios')
+        .delete()
+        .eq('id', gastoId);
+
+      if (errDel) throw errDel;
+
+      await responderCallback(callbackQueryId, 'Gasto excluído!');
+      
+      const msgEdit = obterFalaAzula(`😼 Gasto excluído! Menos um registro para eu me preocupar.`);
+      await editarMensagem(chatId, messageId, msgEdit);
+    }
+  } catch (error: any) {
+    console.error('Erro ao processar callback_query:', error.message);
+    await responderCallback(callbackQueryId, 'Erro ao processar a classificação.');
+  }
 }
 
 function obterFalaAzula(falaBase: string): string {
@@ -368,8 +455,8 @@ Se for "comprovante_gasto":
         obterFalaAzula(`😼 Consegui registrar seu contracheque de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Já salvei tudo no painel, incluindo os descontos. Agora vai lá ver o estrago.`)
       );
     } else if (extracao.tipo_documento === 'comprovante_gasto') {
-      // Salvar gasto diário
-      const { error: errGasto } = await supabase
+      // Salvar gasto diário como não confirmado
+      const { data: gasto, error: errGasto } = await supabase
         .from('gastos_diarios')
         .insert({
           usuario_id: usuario.id,
@@ -378,17 +465,17 @@ Se for "comprovante_gasto":
           categoria: extracao.categoria || 'outros',
           data: extracao.data || new Date().toISOString().substring(0, 10),
           origem: 'telegram',
-          confirmado: true,
-        });
+          confirmado: false,
+        })
+        .select()
+        .single();
 
-      if (errGasto) {
-        throw new Error('Erro ao salvar gasto diário: ' + errGasto.message);
+      if (errGasto || !gasto) {
+        throw new Error('Erro ao salvar gasto diário: ' + (errGasto?.message || 'Sem dados de retorno'));
       }
 
-      await enviarMensagem(
-        chatId,
-        obterFalaAzula(`😼 Gasto de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no estabelecimento <b>${extracao.estabelecimento}</b> registrado com sucesso! Menos dinheiro para o meu papa...`)
-      );
+      const msgText = obterFalaAzula(`😼 Identifiquei um gasto de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no estabelecimento <b>${extracao.estabelecimento}</b>.\n\nEsse gasto foi do quê, meu chapa? Escolha a categoria abaixo para eu registrar:`);
+      await enviarMensagemComBotoes(chatId, msgText, botoesCategorias(gasto.id));
     } else {
       throw new Error('Esse documento não se parece com um contracheque ou comprovante de gasto válido.');
     }
@@ -408,7 +495,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body: TelegramMessage = await req.json();
+    const body: any = await req.json();
+
+    // Se for interação com botão inline
+    if (body.callback_query) {
+      await handleCallbackQuery(body.callback_query);
+      return NextResponse.json({ ok: true });
+    }
+
     const message = body.message;
 
     if (!message) {
