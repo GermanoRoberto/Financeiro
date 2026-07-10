@@ -8,37 +8,37 @@ interface SeletorVisaoProps {
 
 export default function SeletorVisao({ visao, onChange, temEsposa }: SeletorVisaoProps) {
   return (
-    <div className="flex gap-3 mb-6">
+    <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl flex inline-flex gap-1.5 shadow-xl shadow-slate-950/20 max-w-full overflow-x-auto">
       <button
         onClick={() => onChange('casal')}
-        className={`px-6 py-2 rounded-lg font-medium transition-all ${
+        className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
           visao === 'casal'
-            ? 'bg-blue-600 text-white shadow-lg'
-            : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-500'
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/10 active:scale-95'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
         }`}
       >
-        👫 Casal
+        <span>👫</span> Casal
       </button>
       <button
         onClick={() => onChange('voce')}
-        className={`px-6 py-2 rounded-lg font-medium transition-all ${
+        className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
           visao === 'voce'
-            ? 'bg-blue-600 text-white shadow-lg'
-            : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-500'
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/10 active:scale-95'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
         }`}
       >
-        👤 Você
+        <span>👤</span> Você
       </button>
       {temEsposa && (
         <button
           onClick={() => onChange('esposa')}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${
+          className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
             visao === 'esposa'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-500'
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/10 active:scale-95'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           }`}
         >
-          💑 Esposa
+          <span>💑</span> Esposa
         </button>
       )}
     </div>

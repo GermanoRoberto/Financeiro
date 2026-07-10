@@ -94,7 +94,6 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   // Filtrar dados conforme a visão
   const descontosAtivos = descontos.filter((_d) => {
     if (visao === 'casal') return true;
-    // Filtrar por usuário (via contrato)
     return true; // TODO: implementar filtro correto
   });
 
@@ -119,92 +118,109 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
   if (carregando) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DashboardHeader usuario={usuarioAtivo} onLogout={handleLogout} />
+    <div className="min-h-screen bg-gradient-to-tr from-[#021f54] via-[#0946b5] to-[#120436] text-slate-100 font-sans relative overflow-x-hidden">
+      
+      {/* Círculos de Brilho / Gradiente em Segundo Plano (Glow Effect) */}
+      <div className="absolute top-20 left-10 w-96 h-96 rounded-full bg-blue-500/10 filter blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-[500px] h-[500px] rounded-full bg-indigo-500/10 filter blur-[120px] pointer-events-none" />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Seletor de Visão */}
-        <SeletorVisao visao={visao} onChange={setVisao} temEsposa={!!usuarioEsposa} />
+      {/* Header Fixo */}
+      <DashboardHeader usuario={usuario} onLogout={handleLogout} />
 
-        {/* Abas de Navegação */}
-        <div className="flex gap-4 mb-6 border-b border-gray-200">
-          <button
-            onClick={() => setAbaAtiva('dashboard')}
-            className={`px-4 py-3 font-medium transition-colors ${
-              abaAtiva === 'dashboard'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            📊 Dashboard
-          </button>
-          <button
-            onClick={() => setAbaAtiva('contracheque')}
-            className={`px-4 py-3 font-medium transition-colors ${
-              abaAtiva === 'contracheque'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            📄 Contracheques
-          </button>
-          <button
-            onClick={() => setAbaAtiva('dividas')}
-            className={`px-4 py-3 font-medium transition-colors ${
-              abaAtiva === 'dividas'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            💳 Dívidas
-          </button>
+      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8 relative z-10">
+        
+        {/* Barra superior de controles */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-3xl backdrop-blur-md">
+          {/* Seletor de Visão */}
+          <SeletorVisao visao={visao} onChange={setVisao} temEsposa={!!usuarioEsposa} />
+
+          {/* Abas de Navegação */}
+          <div className="flex bg-slate-950/40 p-1.5 rounded-2xl border border-white/5 max-w-full overflow-x-auto self-start md:self-auto">
+            <button
+              onClick={() => setAbaAtiva('dashboard')}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                abaAtiva === 'dashboard'
+                  ? 'bg-white text-slate-900 shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              📊 Dashboard
+            </button>
+            <button
+              onClick={() => setAbaAtiva('contracheque')}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                abaAtiva === 'contracheque'
+                  ? 'bg-white text-slate-900 shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              📄 Contracheques
+            </button>
+            <button
+              onClick={() => setAbaAtiva('dividas')}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                abaAtiva === 'dividas'
+                  ? 'bg-white text-slate-900 shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              💳 Dívidas
+            </button>
+          </div>
         </div>
 
-        {/* Conteúdo das Abas */}
-        {abaAtiva === 'dashboard' && (
-          <div className="space-y-6">
-            {/* Cards de Resumo */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <ResumoCard
-                titulo="Salário Bruto"
-                valor={salarioBruto}
-                cor="blue"
-              />
-              <ResumoCard
-                titulo="Salário Líquido"
-                valor={salarioLiquido}
-                cor="green"
-              />
-              <ResumoCard
-                titulo="Comprometimento"
-                valor={comprometimento}
-                sufixo="%"
-                cor={comprometimento > 50 ? 'red' : comprometimento > 30 ? 'yellow' : 'green'}
-              />
+        {/* Conteúdo Principal com base na aba ativa */}
+        <div className="transition-all duration-300">
+          {abaAtiva === 'dashboard' && (
+            <div className="space-y-8 animate-fadeIn">
+              
+              {/* Seção de Resumos - Grid de Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <ResumoCard
+                  titulo="Salário Bruto"
+                  valor={salarioBruto}
+                  cor="blue"
+                />
+                <ResumoCard
+                  titulo="Salário Líquido"
+                  valor={salarioLiquido}
+                  cor="green"
+                />
+                <ResumoCard
+                  titulo="Comprometimento"
+                  valor={comprometimento}
+                  sufixo="%"
+                  cor={comprometimento > 50 ? 'red' : comprometimento > 30 ? 'yellow' : 'green'}
+                />
+              </div>
+
+              {/* Seção de Gráficos */}
+              <GraficosFinanceiros projecao={projecao} />
+
+              {/* Tabela de Prospecção */}
+              <TabMeses projecao={projecao} />
             </div>
+          )}
 
-            {/* Gráficos */}
-            <GraficosFinanceiros projecao={projecao} />
+          {abaAtiva === 'contracheque' && (
+            <div className="animate-fadeIn max-w-3xl mx-auto">
+              <UploadContracheque usuarioId={usuarioAtivo.id} onUploadSuccess={carregarDados} />
+            </div>
+          )}
 
-            {/* Tabela de Projeção */}
-            <TabMeses projecao={projecao} />
-          </div>
-        )}
-
-        {abaAtiva === 'contracheque' && (
-          <UploadContracheque usuarioId={usuarioAtivo.id} onUploadSuccess={carregarDados} />
-        )}
-
-        {abaAtiva === 'dividas' && (
-          <CadastroDivida usuarioId={usuarioAtivo.id} onSuccess={carregarDados} />
-        )}
+          {abaAtiva === 'dividas' && (
+            <div className="animate-fadeIn max-w-3xl mx-auto">
+              <CadastroDivida usuarioId={usuarioAtivo.id} onSuccess={carregarDados} />
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
