@@ -116,9 +116,10 @@ Formato esperado:
       );
     }
   } catch (error: any) {
-    console.error('Erro na extração via Gemini:', error.message);
+    const detalheErro = error.response?.data?.error?.message || error.message;
+    console.error('Erro na extração via Gemini:', detalheErro);
     return NextResponse.json(
-      { error: error.message || 'Erro ao processar arquivo' },
+      { error: detalheErro || 'Erro ao processar arquivo' },
       { status: 500 }
     );
   }

@@ -78,31 +78,18 @@ ALTER TABLE dividas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gastos_diarios ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies: usuarios_permitidos
-CREATE POLICY "usuarios_podem_ver_proprios_dados"
-ON usuarios_permitidos
-FOR SELECT
-USING (user_id = auth.uid());
-
-CREATE POLICY "usuarios_podem_atualizar_proprios_dados"
-ON usuarios_permitidos
-FOR UPDATE
-USING (user_id = auth.uid());
+CREATE POLICY "permitir_leitura_todos_usuarios" ON usuarios_permitidos FOR SELECT TO authenticated USING (true);
+CREATE POLICY "permitir_update_proprio_usuario" ON usuarios_permitidos FOR UPDATE TO authenticated USING (user_id = auth.uid());
 
 -- RLS Policies: contracheques
-CREATE POLICY "acesso_restrito_ao_proprio_usuario"
-ON contracheques
-FOR ALL
-USING (
-  usuario_id IN (
-    SELECT id FROM usuarios_permitidos WHERE user_id = auth.uid()
-  )
-);
+CREATE POLICY "permitir_leitura_todos_contracheques" ON contracheques FOR SELECT TO authenticated USING (true);
+CREATE POLICY "permitir_insercao_proprio_contracheque" ON contracheques FOR INSERT TO authenticated WITH CHECK (usuario_id IN (SELECT id FROM usuarios_permitidos WHERE user_id = auth.uid()));
+CREATE POLICY "permitir_update_proprio_contracheque" ON contracheques FOR UPDATE TO authenticated USING (usuario_id IN (SELECT id FROM usuarios_permitidos WHERE user_id = auth.uid()));
+CREATE POLICY "permitir_delete_proprio_contracheque" ON contracheques FOR DELETE TO authenticated USING (usuario_id IN (SELECT id FROM usuarios_permitidos WHERE user_id = auth.uid()));
 
--- RLS Policies: descontos (cascata de contracheques)
-CREATE POLICY "acesso_descontos_via_contracheque"
-ON descontos
-FOR ALL
-USING (
+-- RLS Policies: descontos
+CREATE POLICY "permitir_leitura_todos_descontos" ON descontos FOR SELECT TO authenticated USING (true);
+CREATE POLICY "permitir_escrita_propria_descontos" ON descontos FOR ALL TO authenticated USING (
   contracheque_id IN (
     SELECT id FROM contracheques
     WHERE usuario_id IN (
@@ -112,10 +99,8 @@ USING (
 );
 
 -- RLS Policies: dividas
-CREATE POLICY "acesso_a_dividas_proprias_ou_conjuntas"
-ON dividas
-FOR ALL
-USING (
+CREATE POLICY "permitir_leitura_todas_dividas" ON dividas FOR SELECT TO authenticated USING (true);
+CREATE POLICY "permitir_escrita_propria_ou_conjunta_dividas" ON dividas FOR ALL TO authenticated USING (
   usuario_id IS NULL
   OR usuario_id IN (
     SELECT id FROM usuarios_permitidos WHERE user_id = auth.uid()
@@ -123,10 +108,8 @@ USING (
 );
 
 -- RLS Policies: gastos_diarios
-CREATE POLICY "acesso_gastos_proprios"
-ON gastos_diarios
-FOR ALL
-USING (
+CREATE POLICY "permitir_leitura_todos_gastos" ON gastos_diarios FOR SELECT TO authenticated USING (true);
+CREATE POLICY "permitir_escrita_propria_gastos" ON gastos_diarios FOR ALL TO authenticated USING (
   usuario_id IN (
     SELECT id FROM usuarios_permitidos WHERE user_id = auth.uid()
   )
