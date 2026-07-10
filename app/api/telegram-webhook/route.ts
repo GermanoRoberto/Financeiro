@@ -61,7 +61,7 @@ async function enviarMensagem(chatId: number, texto: string) {
 }
 
 async function handleStart(chatId: number) {
-  const mensagem = `😼 <b>Miau!</b> Sou a <b>Azula</b>, a gata passiva-agressiva que de fato controla as finanças desta casa. Se você veio aqui me incomodar, pelo menos faça direito.\n\nUse o comando <b>/vincular &lt;codigo&gt;</b> para conectar seu Telegram ao painel (se é que você lembra o código que gerou no dashboard).`;
+  const mensagem = `😼 <b>Miau! Bué!</b> Sou a <b>Azula</b>, a gata passiva-agressiva que de fato manda nessa casa. muéhehehehe. Se você veio aqui me incomodar, pelo menos faça direito.\n\nUse o comando <b>/vincular &lt;codigo&gt;</b> para conectar seu Telegram ao painel (se é que você lembra o código que gerou no dashboard).`;
   await enviarMensagem(chatId, mensagem);
 }
 
@@ -69,7 +69,7 @@ async function handleVincular(chatId: number, codigo: string) {
   if (!codigo) {
     await enviarMensagem(
       chatId,
-      '😾 Miau! Cadê o código? Não tenho bola de cristal para adivinhar. Digite <b>/vincular &lt;codigo&gt;</b>.'
+      '😾 Miau! Cadê o código? Não tenho bola de cristal para adivinhar. Digite <b>/vincular &lt;codigo&gt;</b>. Bué!'
     );
     return;
   }
@@ -86,7 +86,7 @@ async function handleVincular(chatId: number, codigo: string) {
   if (erroFetch || !usuario) {
     await enviarMensagem(
       chatId,
-      '😾 Esse código é inválido ou já expirou! Você digitou certo ou está com preguiça de copiar no teclado?'
+      '😾 Esse código é inválido ou já expirou! Você digitou certo ou está com preguiça de copiar no teclado? Bué!'
     );
     return;
   }
@@ -101,14 +101,14 @@ async function handleVincular(chatId: number, codigo: string) {
     console.error('Erro ao atualizar chat_id no banco:', erroUpdate.message);
     await enviarMensagem(
       chatId,
-      '😾 Tentei salvar suas informações, mas deu erro no banco de dados. Volte a tentar mais tarde.'
+      '😾 Tentei salvar suas informações, mas deu erro no banco de dados. Volte a tentar mais tarde. Bué!'
     );
     return;
   }
 
   await enviarMensagem(
     chatId,
-    `😼 Pronto, <b>${usuario.nome}</b>. Seu Telegram foi vinculado. Agora você pode me mandar seus gastos e contracheques. Não que eu me importe com o quanto você gasta com sachê ruim...`
+    `😼 Pronto, <b>${usuario.nome}</b>. Seu Telegram foi vinculado. Agora você pode me mandar seus gastos e contracheques. Não que eu me importe com o quanto você gasta com sachê ruim... se gastasse com o meu <b>papa</b> seria bem melhor! Bué! muéhehehehe.`
   );
 }
 
@@ -118,7 +118,7 @@ async function handleResumo(chatId: number) {
   if (!usuario) {
     await enviarMensagem(
       chatId,
-      '😾 Sua conta não está vinculada! Use <b>/vincular &lt;codigo&gt;</b> ou suma daqui.'
+      '😾 Sua conta não está vinculada! Use <b>/vincular &lt;codigo&gt;</b> ou suma daqui. Bué!'
     );
     return;
   }
@@ -133,7 +133,7 @@ async function handleResumo(chatId: number) {
     .single();
 
   if (!contracheques) {
-    await enviarMensagem(chatId, '📋 Não encontrei nenhum contracheque cadastrado. Vá no painel e envie algum.');
+    await enviarMensagem(chatId, '📋 Não encontrei nenhum contracheque cadastrado. Vá no painel e envie algum. Bué!');
     return;
   }
 
@@ -156,7 +156,7 @@ async function handleResumo(chatId: number) {
 🚫 Total de Descontos: R$ ${totalDescontos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
 📈 Comprometimento: ${comprometimento}%
 
-😼 <i>Se gastasse menos com bobagens inúteis e mais com sachê premium para mim, esses números seriam bem melhores.</i>
+😼 <i>Se gastasse menos com bobagens inúteis e mais com o meu <b>papa</b> premium, esses números seriam bem melhores. A <b>Velha</b> concorda comigo, aposto. Bué! muéhehehehe.</i>
   `;
 
   await enviarMensagem(chatId, mensagem);
@@ -168,7 +168,7 @@ async function handleDividas(chatId: number) {
   if (!usuario) {
     await enviarMensagem(
       chatId,
-      '😾 Sua conta não está vinculada! Use <b>/vincular &lt;codigo&gt;</b> ou suma daqui.'
+      '😾 Sua conta não está vinculada! Use <b>/vincular &lt;codigo&gt;</b> ou suma daqui. Bué!'
     );
     return;
   }
@@ -181,7 +181,7 @@ async function handleDividas(chatId: number) {
     .eq('ativa', true);
 
   if (!dividas || dividas.length === 0) {
-    await enviarMensagem(chatId, '😼 Olha só, nenhuma dívida ativa! Mas aposto que vai arrumar uma nova em breve.');
+    await enviarMensagem(chatId, '😼 Olha só, nenhuma dívida ativa! Mas aposto que você e a <b>Velha</b> vão arrumar uma nova em breve. Bué! muéhehehehe.');
     return;
   }
 
@@ -194,7 +194,7 @@ async function handleDividas(chatId: number) {
     mensagem += `  Total Pendente: R$ ${totalRestante}\n\n`;
   });
 
-  mensagem += '😼 <i>Se vocês não pagarem isso, quem vai comprar minhas latinhas de atum? Pensem nisso.</i>';
+  mensagem += '😼 <i>Se vocês não pagarem isso, quem vai comprar o meu <b>papa</b>? A <b>Velha</b>? Duvido! Pensem nisso. Bué! muéhehehehe.</i>';
 
   await enviarMensagem(chatId, mensagem);
 }
@@ -230,12 +230,12 @@ export async function POST(req: NextRequest) {
     } else if (text.startsWith('/')) {
       await enviarMensagem(
         chatId,
-        '😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas'
+        '😾 Hum? Bué! Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas. muéhehehehe.'
       );
     } else if (message.photo || message.document) {
       await enviarMensagem(
         chatId,
-        '😼 Recebi esse arquivo aí. Vou mandar pro painel, mas não espere que eu faça carinho por isso...'
+        '😼 Recebi esse arquivo aí. Vou mandar pro painel para registrar esses gastos (espero que não seja com bobagem e sim com meu <b>papa</b>). Não espere que eu faça carinho por isso... Bué! muéhehehehe.'
       );
     }
 
