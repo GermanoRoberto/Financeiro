@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Lista fechada de usuários autorizados
-CREATE TABLE usuarios_permitidos (
+CREATE TABLE IF NOT EXISTS usuarios_permitidos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
   nome TEXT NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE usuarios_permitidos (
 );
 
 -- Contracheques (metadados + valores, nunca o arquivo original)
-CREATE TABLE contracheques (
+CREATE TABLE IF NOT EXISTS contracheques (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id UUID NOT NULL REFERENCES usuarios_permitidos(id) ON DELETE CASCADE,
   mes_referencia DATE NOT NULL, -- primeiro dia do mês, ex: 2026-07-01
@@ -24,7 +24,7 @@ CREATE TABLE contracheques (
 );
 
 -- Descontos extraídos de cada contracheque
-CREATE TABLE descontos (
+CREATE TABLE IF NOT EXISTS descontos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contracheque_id UUID NOT NULL REFERENCES contracheques(id) ON DELETE CASCADE,
   tipo TEXT NOT NULL, -- ex: 'consignado', 'plano_saude', 'inss', 'vale'
@@ -37,7 +37,7 @@ CREATE TABLE descontos (
 );
 
 -- Dívidas cadastradas manualmente (fora do contracheque)
-CREATE TABLE dividas (
+CREATE TABLE IF NOT EXISTS dividas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id UUID REFERENCES usuarios_permitidos(id) ON DELETE CASCADE, -- null = dívida conjunta
   credor TEXT NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE dividas (
 );
 
 -- Gastos do dia a dia, capturados via Telegram
-CREATE TABLE gastos_diarios (
+CREATE TABLE IF NOT EXISTS gastos_diarios (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id UUID NOT NULL REFERENCES usuarios_permitidos(id) ON DELETE CASCADE,
   valor NUMERIC(12,2) NOT NULL,
