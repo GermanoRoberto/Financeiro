@@ -12,6 +12,7 @@ import TabMeses from '@/components/TabMeses';
 import UploadContracheque from '@/components/UploadContracheque';
 import CadastroDivida from '@/components/CadastroDivida';
 import GraficosFinanceiros from '@/components/GraficosFinanceiros';
+import VincularTelegram from '@/components/VincularTelegram';
 import toast from 'react-hot-toast';
 
 type Visao = 'casal' | 'voce' | 'esposa';
@@ -28,7 +29,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   const [_gastos, setGastos] = useState<GastoDiario[]>([]);
   const [usuarioEsposa, setUsuarioEsposa] = useState<Usuario | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'contracheque' | 'dividas'>('dashboard');
+  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'contracheque' | 'dividas' | 'telegram'>('dashboard');
 
   useEffect(() => {
     carregarDados();
@@ -173,6 +174,16 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
             >
               💳 Dívidas
             </button>
+            <button
+              onClick={() => setAbaAtiva('telegram')}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                abaAtiva === 'telegram'
+                  ? 'bg-white text-slate-900 shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🤖 Telegram
+            </button>
           </div>
         </div>
 
@@ -218,6 +229,12 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
           {abaAtiva === 'dividas' && (
             <div className="animate-fadeIn max-w-3xl mx-auto">
               <CadastroDivida usuarioId={usuarioAtivo.id} onSuccess={carregarDados} />
+            </div>
+          )}
+
+          {abaAtiva === 'telegram' && (
+            <div className="animate-fadeIn max-w-xl mx-auto">
+              <VincularTelegram />
             </div>
           )}
         </div>

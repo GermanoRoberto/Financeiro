@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS usuarios_permitidos (
   nome TEXT NOT NULL,
   user_id UUID UNIQUE, -- preenchido com auth.uid() no primeiro login válido
   telegram_chat_id BIGINT UNIQUE,
+  telegram_codigo TEXT UNIQUE,
   criado_em TIMESTAMPTZ DEFAULT now()
 );
 
