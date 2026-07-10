@@ -132,8 +132,8 @@ USING (
   )
 );
 
--- Dados de teste
+-- Usuários autorizados
 INSERT INTO usuarios_permitidos (email, nome)
-VALUES ('germano@example.com', 'Germano'),
-       ('esposa@example.com', 'Esposa')
+VALUES ('germanorcarmo@gmail.com', 'Germano'),
+       ('priscilaaparecida0@gmail.com', 'Priscila')
 ON CONFLICT (email) DO NOTHING;
