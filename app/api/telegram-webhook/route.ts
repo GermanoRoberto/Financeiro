@@ -529,10 +529,7 @@ export async function POST(req: NextRequest) {
         obterFalaAzula('😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas.')
       );
     } else if (message.photo || message.document) {
-      // Processar arquivo de forma assíncrona para retornar status rápido ao Telegram
-      processarArquivoTelegram(chatId, message).catch(err => {
-        console.error('Erro na chamada assíncrona de processamento:', err.message);
-      });
+      await processarArquivoTelegram(chatId, message);
     } else {
       await enviarMensagem(
         chatId,
