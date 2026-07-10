@@ -39,11 +39,10 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     try {
       setCarregando(true);
 
-      // Carregar dados do usuário atual
+      // Carregar dados de ambos os usuários (já que RLS agora permite leitura compartilhada)
       const { data: contratachequeData } = await supabase
         .from('contracheques')
         .select('*')
-        .eq('usuario_id', usuario.id)
         .order('mes_referencia', { ascending: false });
 
       const { data: descontosData } = await supabase
@@ -51,19 +50,16 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
         .select(
           `*,
           contracheque:contracheques(usuario_id)`
-        )
-        .eq('contracheques.usuario_id', usuario.id);
+        );
 
       const { data: dividasData } = await supabase
         .from('dividas')
         .select('*')
-        .or(`usuario_id.eq.${usuario.id},usuario_id.is.null`)
         .eq('ativa', true);
 
       const { data: gastosData } = await supabase
         .from('gastos_diarios')
         .select('*')
-        .eq('usuario_id', usuario.id)
         .order('data', { ascending: false });
 
       setContracheques(contratachequeData || []);
@@ -92,10 +88,27 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
   const usuarioAtivo = visao === 'esposa' && usuarioEsposa ? usuarioEsposa : usuario;
 
-  // Filtrar dados conforme a visão
-  const descontosAtivos = descontos.filter((_d) => {
+  // Filtrar contracheques conforme a visão
+  const contrachequesAtivos = contracheques.filter((c) => {
     if (visao === 'casal') return true;
-    return true; // TODO: implementar filtro correto
+    return c.usuario_id === usuarioAtivo.id;
+  });
+
+  // Obter o contracheque mais recente para calcular o resumo do mês atual
+  const ultimoMes = contrachequesAtivos[0]?.mes_referencia;
+  const contrachequesMesAtual = contrachequesAtivos.filter(
+    (c) => c.mes_referencia === ultimoMes
+  );
+
+  const salarioBruto = contrachequesMesAtual.reduce((acc, c) => acc + (c.salario_bruto || 0), 0);
+  const salarioLiquido = contrachequesMesAtual.reduce((acc, c) => acc + (c.salario_liquido || 0), 0);
+
+  // Filtrar descontos conforme a visão
+  const descontosAtivos = descontos.filter((d: any) => {
+    const contrachequeObj = d.contracheque;
+    const contrachequeUserId = contrachequeObj?.usuario_id;
+    if (visao === 'casal') return true;
+    return contrachequeUserId === usuarioAtivo.id;
   });
 
   const dividasAtivas = dividas.filter((d) => {
@@ -103,10 +116,6 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     if (d.usuario_id === null) return true; // dívida conjunta
     return d.usuario_id === usuarioAtivo.id;
   });
-
-  const contrachequeAtual = contracheques[0];
-  const salarioBruto = contrachequeAtual?.salario_bruto || 0;
-  const salarioLiquido = contrachequeAtual?.salario_liquido || 0;
 
   const totalDescontos = descontosAtivos.reduce((acc, d) => acc + (d.valor || 0), 0);
   const comprometimento = calcularComprometimento(totalDescontos, salarioBruto);
