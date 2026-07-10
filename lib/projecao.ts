@@ -1,5 +1,5 @@
 import { Desconto, Divida } from './types';
-import { addMonths, startOfMonth, isSameMonth } from 'date-fns';
+import { addMonths, startOfMonth } from 'date-fns';
 
 export interface ProjecaoMes {
   mes: Date;
@@ -14,7 +14,7 @@ export interface ProjecaoMes {
 export function projetarDescontos(
   descontos: Desconto[],
   dividas: Divida[],
-  salarioBruto: number = 0,
+  _salarioBruto: number = 0,
   mesesAFrente: number = 12
 ): ProjecaoMes[] {
   const meses: ProjecaoMes[] = [];

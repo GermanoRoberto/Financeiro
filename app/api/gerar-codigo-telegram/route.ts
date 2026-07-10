@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabaseClient';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,9 +8,6 @@ export async function GET(req: NextRequest) {
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const userId = authHeader.split(' ')[1];
-    const supabase = supabaseServer();
 
     // Gerar código único (simplificado - usar UUID em produção)
     const codigo = Math.random().toString(36).substring(2, 8).toUpperCase();

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // TODO: Validar código
     // Por enquanto, vamos aceitar qualquer código
-    const { data: usuarioAtualizado, error: erroUpdate } = await supabase
+    const { error: erroUpdate } = await supabase
       .from('usuarios_permitidos')
       .update({ telegram_chat_id: codigo }) // aqui seria chat_id do telegram
       .eq('id', usuario.id)

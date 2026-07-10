@@ -2,8 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { extrairContracheque } from '@/lib/geminiClient';
-import { Contracheque, Desconto } from '@/lib/types';
 import toast from 'react-hot-toast';
 import ConfirmacaoContracheque from './ConfirmacaoContracheque';
 
@@ -22,19 +20,49 @@ export default function UploadContracheque({ usuarioId, onUploadSuccess }: Uploa
     const file = event.target.files?.[0];
     if (!file) return;
 
-    try {
-      setCarregando(true);
-      const dados = await extrairContracheque(file);
-      setDadosExtraidos(dados);
-      toast.success('Dados extraídos com sucesso!');
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao extrair dados do contracheque');
-    } finally {
-      setCarregando(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+    setCarregando(true);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const base64Data = (e.target?.result as string).split(',')[1];
+        const response = await fetch('/api/gemini-extract', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            file: {
+              type: file.type,
+              data: base64Data,
+            },
+            tipo: 'contracheque',
+          }),
+        });
+
+        const dados = await response.json();
+        if (!response.ok) {
+          throw new Error(dados.error || 'Erro ao extrair dados do contracheque');
+        }
+
+        setDadosExtraidos(dados);
+        toast.success('Dados extraídos com sucesso!');
+      } catch (error: any) {
+        toast.error(error.message || 'Erro ao extrair dados do contracheque');
+      } finally {
+        setCarregando(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
-    }
+    };
+
+    reader.onerror = () => {
+      toast.error('Erro ao ler arquivo');
+      setCarregando(false);
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleConfirmar = async (dados: any, mes: string) => {

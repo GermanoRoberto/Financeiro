@@ -36,7 +36,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="mes" />
             <YAxis />
-            <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+            <Tooltip formatter={(value) => `R$ ${Number(value).toFixed(2)}`} />
             <Legend />
             <Bar dataKey="descontos" fill="#3b82f6" name="Descontos" />
             <Bar dataKey="dividas" fill="#ef4444" name="Dívidas" />
@@ -64,7 +64,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+              <Tooltip formatter={(value) => `R$ ${Number(value).toFixed(2)}`} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -81,7 +81,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="mes" />
             <YAxis />
-            <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+            <Tooltip formatter={(value) => `R$ ${Number(value).toFixed(2)}`} />
             <Legend />
             <Line type="monotone" dataKey="total" stroke="#3b82f6" name="Total" strokeWidth={2} />
           </LineChart>

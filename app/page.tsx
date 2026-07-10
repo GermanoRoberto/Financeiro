@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { verificarAcessoAutorizado, obterOuCriarUsuario, logout } from '@/lib/auth';
 import { Usuario } from '@/lib/types';
-import LoginPage from './login/page';
-import DashboardPage from './dashboard/page';
+import LoginPage from '@/components/LoginPage';
+import DashboardPage from '@/components/DashboardPage';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function Home() {
@@ -90,7 +90,7 @@ export default function Home() {
       {autenticado && usuario ? (
         <DashboardPage usuario={usuario} />
       ) : (
-        <LoginPage onLoginSuccess={procesarLogin} />
+        <LoginPage onLoginSuccess={processarLogin} />
       )}
     </>
   );

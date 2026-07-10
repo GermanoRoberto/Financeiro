@@ -4,7 +4,6 @@ import axios from 'axios';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || '';
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
 if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_WEBHOOK_SECRET) {
   console.warn('Telegram env vars not set');
@@ -61,7 +60,7 @@ async function enviarMensagem(chatId: number, texto: string) {
   });
 }
 
-async function handleVincular(chatId: number, codigo: string) {
+async function handleVincular(chatId: number, _codigo: string) {
   // TODO: Validar código e vincular chat_id
   await enviarMensagem(
     chatId,
