@@ -237,6 +237,11 @@ export async function POST(req: NextRequest) {
         chatId,
         '😼 Recebi esse arquivo aí. Vou mandar pro painel para registrar esses gastos (espero que não seja com bobagem e sim com meu <b>papa</b>). Não espere que eu faça carinho por isso... Bué! muéhehehehe.'
       );
+    } else {
+      await enviarMensagem(
+        chatId,
+        '😼 Humano... você fala demais. Eu sou uma gata ocupada, não tenho tempo para papo furado. Mande o meu <b>papa</b> (comprovante) ou use <b>/resumo</b> e <b>/dividas</b> para ver se ainda tem dinheiro para sachê. Bué! muéhehehehe.'
+      );
     }
 
     return NextResponse.json({ ok: true });
