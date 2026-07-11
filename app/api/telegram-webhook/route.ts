@@ -562,5 +562,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({ message: 'Telegram webhook active' });
+  try {
+    console.log('GET request received on telegram-webhook');
+    return NextResponse.json({ message: 'Telegram webhook active' });
+  } catch (err: any) {
+    console.error('GET error:', err.message, err.stack);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }
+

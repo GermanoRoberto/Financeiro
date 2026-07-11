@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { PDFParse } from 'pdf-parse';
 
 const PROMPT_CONTRACHEQUE = `Analise detalhadamente o contracheque/holerite brasileiro fornecido.
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown (sem \`\`\`json) ou textos adicionais.
@@ -117,7 +116,9 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     try {
       console.log('Extraindo texto do PDF via pdf-parse...');
       const buffer = Buffer.from(base64, 'base64');
-      const parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const pdfParseModule = require('pdf-parse');
+      const PDFParseClass = pdfParseModule.PDFParse || pdfParseModule;
+      const parser = new PDFParseClass({ data: new Uint8Array(buffer) });
       const textResult = await parser.getText();
       
       if (textResult && textResult.text && textResult.text.trim().length > 0) {
