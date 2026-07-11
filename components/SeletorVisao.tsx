@@ -4,9 +4,10 @@ interface SeletorVisaoProps {
   visao: 'casal' | 'voce' | 'esposa';
   onChange: (visao: 'casal' | 'voce' | 'esposa') => void;
   temEsposa: boolean;
+  nomeParceiro?: string;
 }
 
-export default function SeletorVisao({ visao, onChange, temEsposa }: SeletorVisaoProps) {
+export default function SeletorVisao({ visao, onChange, temEsposa, nomeParceiro }: SeletorVisaoProps) {
   return (
     <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl flex inline-flex gap-1.5 shadow-xl shadow-slate-950/20 max-w-full overflow-x-auto">
       <button
@@ -38,7 +39,7 @@ export default function SeletorVisao({ visao, onChange, temEsposa }: SeletorVisa
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           }`}
         >
-          <span>💑</span> Esposa
+          <span>💑</span> {nomeParceiro || 'Parceiro(a)'}
         </button>
       )}
     </div>

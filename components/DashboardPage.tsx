@@ -215,7 +215,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
         {/* Barra superior de controles */}
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-3xl backdrop-blur-md">
           {/* Seletor de Visão */}
-          <SeletorVisao visao={visao} onChange={setVisao} temEsposa={!!usuarioEsposa} />
+          <SeletorVisao visao={visao} onChange={setVisao} temEsposa={!!usuarioEsposa} nomeParceiro={usuarioEsposa?.nome} />
 
           {/* Abas de Navegação */}
           <div className="flex bg-slate-950/40 p-1.5 rounded-2xl border border-white/5 max-w-full overflow-x-auto self-start md:self-auto">
@@ -430,7 +430,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                 <div className="lg:col-span-2 space-y-6">
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md">
                     <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                      <span>📄</span> Contracheques Cadastrados ({visao === 'casal' ? 'Casal' : visao === 'voce' ? 'Você' : 'Esposa'})
+                      <span>📄</span> Contracheques Cadastrados ({visao === 'casal' ? 'Casal' : visao === 'voce' ? 'Você' : (usuarioEsposa?.nome || 'Parceiro(a)')})
                     </h3>
                     
                     {contrachequesAtivos.length === 0 ? (
@@ -556,7 +556,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                 <div className="lg:col-span-2 space-y-6">
                   <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md">
                     <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                      <span>💳</span> Dívidas Cadastradas ({visao === 'casal' ? 'Casal' : visao === 'voce' ? 'Você' : 'Esposa'})
+                      <span>💳</span> Dívidas Cadastradas ({visao === 'casal' ? 'Casal' : visao === 'voce' ? 'Você' : (usuarioEsposa?.nome || 'Parceiro(a)')})
                     </h3>
 
                     {dividasAtivas.length === 0 ? (
