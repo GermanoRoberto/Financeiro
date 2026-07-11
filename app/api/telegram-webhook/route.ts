@@ -387,7 +387,7 @@ Se for "contracheque":
   "mes_referencia": "YYYY-MM" (Mês e ano do contracheque, ex: "2026-06"),
   "descontos": [
     {
-      "tipo": string (Nome amigável do desconto, ex: "INSS", "IRRF", "Plano de Saúde", "Empréstimo", "Previdência Municipal (FPM)"). ATENÇÃO: Extraia TODOS os descontos do documento. No contracheque da Prefeitura de Juiz de Fora, a rubrica "FPM (FOLHA)" ou "FPM" é a previdência municipal dos servidores, que é um DESCONTO obrigatório e deve ser extraído com o tipo "Previdência Municipal (FPM)"!),
+      "tipo": string (Descrição/Nome do desconto exatamente como consta escrito no contracheque, ex: "FPM (FOLHA)", "IRRF", "EMPRÉSTIMO CEF", "INSS", "COPARTICIPAÇÃO PLASC"). ATENÇÃO: Extraia TODOS os descontos do documento. No contracheque da Prefeitura de Juiz de Fora, a rubrica "FPM (FOLHA)" ou "FPM" é a previdência municipal dos servidores, que é um DESCONTO obrigatório e deve ser extraído exatamente com o nome "FPM (FOLHA)"!),
       "valor": number (Valor absoluto do desconto como número decimal. ATENÇÃO: Cada linha de evento segue o formato [Código] [Descrição] [Índice/Referência] [Proventos] [Descontos]. O campo Índice/Referência (ex: 14,0000 ou 30,00) NÃO é um valor financeiro de desconto, ignore-o! Extraia apenas valores da coluna real de Descontos, ex: 925.40),
       "parcela_atual": number|null (Se for parcelado/empréstimo, ex: 2 no "02/12"),
       "parcela_total": number|null (Total de parcelas, ex: 12 no "02/12"),
