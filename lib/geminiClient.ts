@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { PDFParse } from 'pdf-parse';
 
 const PROMPT_CONTRACHEQUE = `Analise detalhadamente o contracheque/holerite brasileiro fornecido.
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown (sem \`\`\`json) ou textos adicionais.
@@ -51,17 +52,17 @@ Formato do JSON de retorno esperado:
   "data": "YYYY-MM-DD"
 }`;
 
-async function extrairComGroq(base64: string, mimeType: string, prompt: string): Promise<any> {
+async function extrairComGroq(base64: string, mimeType: string, prompt: string, isTextOnly: boolean): Promise<any> {
   const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
   if (!GROQ_API_KEY) {
     throw new Error('GROQ_API_KEY não configurada na Vercel.');
   }
 
   const isImage = mimeType.startsWith('image/');
-  const model = isImage ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+  const model = isImage && !isTextOnly ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
 
   const messages: any[] = [];
-  if (isImage) {
+  if (isImage && !isTextOnly) {
     messages.push({
       role: 'user',
       content: [
@@ -77,7 +78,7 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string):
   } else {
     messages.push({
       role: 'user',
-      content: `${prompt}\n\n[Nota: Conteúdo do arquivo em base64]:\n${base64.substring(0, 10000)}`
+      content: prompt
     });
   }
 
@@ -103,12 +104,39 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string):
 
 export async function extrairComFallback(base64: string, mimeType: string, prompt: string): Promise<any> {
   const hasGroqKey = !!(process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY);
+  
+  let promptFinal = prompt;
+  let base64OrText = base64;
+  let mimeTypeFinal = mimeType;
+  let isTextOnly = false;
+
+  // Se for um arquivo PDF, vamos extrair o texto localmente via pdf-parse.
+  // Isso resolve o problema de enviar binários pesados para as IAs, economiza tokens
+  // e permite que a Groq (que não aceita PDF diretamente) consiga ler as informações perfeitamente!
+  if (mimeType === 'application/pdf') {
+    try {
+      console.log('Extraindo texto do PDF via pdf-parse...');
+      const buffer = Buffer.from(base64, 'base64');
+      const parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const textResult = await parser.getText();
+      
+      if (textResult && textResult.text && textResult.text.trim().length > 0) {
+        base64OrText = textResult.text;
+        mimeTypeFinal = 'text/plain';
+        isTextOnly = true;
+        promptFinal = `${prompt}\n\n[Texto extraído do PDF]:\n${base64OrText}`;
+        console.log(`Texto extraído do PDF com sucesso (${base64OrText.length} caracteres).`);
+      }
+    } catch (pdfError: any) {
+      console.warn(`Erro ao extrair texto do PDF via pdf-parse: ${pdfError.message}. Enviando PDF binário original.`);
+    }
+  }
 
   // 1. Tentar primeiro com a Groq (IA principal para dados/OCR)
   if (hasGroqKey) {
     try {
       console.log('Iniciando extração via Groq (Principal)...');
-      return await extrairComGroq(base64, mimeType, prompt);
+      return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
     } catch (groqError: any) {
       console.warn(`Erro na Groq (tentando fallback para Gemini): ${groqError.message}`);
     }
@@ -124,18 +152,20 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
       throw new Error('GEMINI_API_KEY não configurada na Vercel.');
     }
 
+    const parts: any[] = [{ text: promptFinal }];
+    if (!isTextOnly) {
+      parts.push({
+        inlineData: {
+          mimeType: mimeTypeFinal,
+          data: base64OrText,
+        },
+      });
+    }
+
     const requestBody = {
       contents: [
         {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType,
-                data: base64,
-              },
-            },
-          ],
+          parts: parts,
         },
       ],
     };
