@@ -399,11 +399,16 @@ Se for "comprovante_gasto":
 
     if (extracao.tipo_documento === 'contracheque') {
       // Salvar contracheque
+      let mesRef = extracao.mes_referencia || new Date().toISOString().substring(0, 7);
+      if (mesRef.length === 7) {
+        mesRef = `${mesRef}-01`;
+      }
+
       const { data: cc, error: errCc } = await supabase
         .from('contracheques')
         .insert({
           usuario_id: usuario.id,
-          mes_referencia: extracao.mes_referencia || new Date().toISOString().substring(0, 7),
+          mes_referencia: mesRef,
           salario_bruto: extracao.salario_bruto || 0,
           salario_liquido: extracao.salario_liquido || 0,
         })
