@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseClient';
 import axios from 'axios';
+import { extrairComFallback } from '@/lib/geminiClient';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || '';
@@ -393,29 +394,7 @@ Se for "comprovante_gasto":
   "data": "YYYY-MM-DD"
 }`;
 
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType,
-                data: base64,
-              },
-            },
-          ],
-        },
-      ],
-    };
-
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || ''}`;
-    const response = await axios.post(geminiUrl, requestBody);
-    const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Parse do JSON da resposta
-    const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const extracao = JSON.parse(jsonStr);
+    const extracao = await extrairComFallback(base64, mimeType, prompt);
     const supabase = supabaseServer();
 
     if (extracao.tipo_documento === 'contracheque') {

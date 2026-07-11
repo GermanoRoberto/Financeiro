@@ -1,34 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent';
-
-if (!GEMINI_API_KEY) {
-  console.warn('GEMINI_API_KEY não configurada');
-}
-
-interface GeminiRequest {
-  contents: Array<{
-    parts: Array<{
-      text?: string;
-      inlineData?: {
-        mimeType: string;
-        data: string;
-      };
-    }>;
-  }>;
-}
-
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{
-        text: string;
-      }>;
-    };
-  }>;
-}
+import { extrairComFallback } from '@/lib/geminiClient';
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,49 +48,12 @@ Formato esperado:
       );
     }
 
-    const requestBody: GeminiRequest = {
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType,
-                data: base64,
-              },
-            },
-          ],
-        },
-      ],
-    };
-
-    const response = await axios.post<GeminiResponse>(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-      requestBody
-    );
-
-    const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Fazer parse do JSON
-    try {
-      const jsonStr = textContent
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-      const dados = JSON.parse(jsonStr);
-      return NextResponse.json(dados);
-    } catch (parseError) {
-      console.error('Erro ao fazer parse do JSON:', textContent);
-      return NextResponse.json(
-        { error: 'Falha ao extrair dados. Resposta inválida da IA.' },
-        { status: 400 }
-      );
-    }
+    const dados = await extrairComFallback(base64, mimeType, prompt);
+    return NextResponse.json(dados);
   } catch (error: any) {
-    const detalheErro = error.response?.data?.error?.message || error.message;
-    console.error('Erro na extração via Gemini:', detalheErro);
+    console.error('Erro na extração via extrator:', error.message);
     return NextResponse.json(
-      { error: detalheErro || 'Erro ao processar arquivo' },
+      { error: error.message || 'Erro ao processar arquivo' },
       { status: 500 }
     );
   }
