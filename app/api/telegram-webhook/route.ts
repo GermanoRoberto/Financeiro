@@ -362,25 +362,25 @@ async function processarArquivoTelegram(chatId: number, message: any) {
     const buffer = Buffer.from(downloadResponse.data);
     const base64 = buffer.toString('base64');
 
-    // 3. Prompt para o Gemini 2.0 Flash
+    // 3. Prompt para o Gemini / Groq com instruções detalhadas
     const prompt = `Analise este documento/imagem e classifique-o em "contracheque" ou "comprovante_gasto".
-Em seguida, extraia as informações no formato JSON correspondente.
-Responda APENAS em JSON válido, sem markdown ou preâmbulo.
+Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown (sem \`\`\`json) ou textos adicionais.
 
 Formato esperado:
+
 Se for "contracheque":
 {
   "tipo_documento": "contracheque",
-  "salario_bruto": number,
-  "salario_liquido": number,
-  "mes_referencia": "YYYY-MM" (por exemplo, "2026-07"),
+  "salario_bruto": number (Identifique o valor total de proventos/ganhos antes dos descontos),
+  "salario_liquido": number (Identifique o líquido a receber/valor final pago em conta),
+  "mes_referencia": "YYYY-MM" (Mês e ano do contracheque, ex: "2026-07"),
   "descontos": [
     {
-      "tipo": string,
-      "valor": number,
-      "parcela_atual": number|null,
-      "parcela_total": number|null,
-      "recorrente": boolean
+      "tipo": string (Nome amigável do desconto, ex: "INSS", "IRRF", "Plano de Saúde", "Empréstimo"),
+      "valor": number (Valor absoluto do desconto),
+      "parcela_atual": number|null (Se for parcelado/empréstimo, ex: 2 no "02/12"),
+      "parcela_total": number|null (Total de parcelas, ex: 12 no "02/12"),
+      "recorrente": boolean (true se for mensal recorrente como INSS, Plano de Saúde, senão false)
     }
   ]
 }
@@ -388,10 +388,10 @@ Se for "contracheque":
 Se for "comprovante_gasto":
 {
   "tipo_documento": "comprovante_gasto",
-  "valor": number,
-  "estabelecimento": string,
+  "valor": number (Valor total pago/transferido),
+  "estabelecimento": string (Nome da empresa, loja, credor ou recebedor do Pix),
   "categoria": string ("alimentação", "transporte", "saúde", "diversão", "outros"),
-  "data": "YYYY-MM-DD"
+  "data": "YYYY-MM-DD" (Data do gasto)
 }`;
 
     const extracao = await extrairComFallback(base64, mimeType, prompt);
