@@ -474,6 +474,10 @@ Se for "contratos_emprestimo":
       );
       const valorAdiantamento = descontoAdiantamentoObj ? Number(descontoAdiantamentoObj.valor) : 0;
 
+      const eDono = usuarioDonoId === usuario.id;
+      const refContracheque = eDono ? 'seu contracheque mensal' : `o contracheque mensal do(a) <b>${nomeDono}</b>`;
+      const refAdiantamento = eDono ? 'seu adiantamento' : `o adiantamento do(a) <b>${nomeDono}</b>`;
+
       if (ccExistente) {
         ccId = ccExistente.id;
         let novoBruto = ccExistente.salario_bruto || 0;
@@ -486,7 +490,7 @@ Se for "contratos_emprestimo":
           
           novoLiquido = Number(dadosBrutosMerged.salario_liquido_mensal || 0) + Number(dadosBrutosMerged.salario_liquido_adiantamento);
           
-          msgRetorno = `😼 Registrei o <b>Adiantamento de R$ ${extracao.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} líquido</b> do(a) <b>${nomeDono}</b> para o mês de ${extracao.mes_referencia}. Ele foi integrado ao contracheque mensal! Líquido total no mês: <b>R$ ${novoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b>.`;
+          msgRetorno = `😼 Registrei ${refAdiantamento} de <b>R$ ${extracao.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} líquido</b> para ${extracao.mes_referencia}. Ele foi integrado ao contracheque mensal! Líquido total no mês: <b>R$ ${novoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b>.`;
         } else {
           novoBruto = extracao.salario_bruto || 0;
           dadosBrutosMerged.salario_liquido_mensal = extracao.salario_liquido || 0;
@@ -494,7 +498,7 @@ Se for "contratos_emprestimo":
           
           novoLiquido = Number(dadosBrutosMerged.salario_liquido_mensal) + Number(dadosBrutosMerged.salario_liquido_adiantamento || 0);
           
-          msgRetorno = `😼 Registrei o contracheque mensal do(a) <b>${nomeDono}</b> de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} bruto</b> para ${extracao.mes_referencia}. Líquido total no mês (mensal + adiantamento): <b>R$ ${novoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b>!`;
+          msgRetorno = `😼 Registrei ${refContracheque} de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} bruto</b> para ${extracao.mes_referencia}. Líquido total no mês (mensal + adiantamento): <b>R$ ${novoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b>!`;
         }
 
         // Atualizar contracheque existente
@@ -561,7 +565,7 @@ Se for "contratos_emprestimo":
           dadosBrutosNew.salario_liquido_mensal = 0;
           dadosBrutosNew.descontos_adiantamento = extracao.descontos || [];
           
-          msgRetorno = `😼 Registrei o <b>Adiantamento de R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} líquido</b> do(a) <b>${nomeDono}</b> para o mês de ${extracao.mes_referencia}. Quando você subir o contracheque mensal, eu mesclarei ambos automaticamente!`;
+          msgRetorno = `😼 Registrei ${refAdiantamento} de <b>R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} líquido</b> para ${extracao.mes_referencia}. Quando você subir o contracheque mensal, eu mesclarei ambos automaticamente!`;
         } else {
           dadosBrutosNew.salario_liquido_mensal = liquido;
           dadosBrutosNew.descontos_mensal = extracao.descontos || [];
@@ -569,9 +573,9 @@ Se for "contratos_emprestimo":
           if (valorAdiantamento > 0) {
             dadosBrutosNew.salario_liquido_adiantamento = valorAdiantamento;
             liquido = Number(liquido) + valorAdiantamento;
-            msgRetorno = `😼 Consegui registrar o contracheque do(a) <b>${nomeDono}</b> de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} bruto</b> para o mês de ${extracao.mes_referencia}! Já incorporei o valor estimado do adiantamento de R$ ${valorAdiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no líquido total (R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).`;
+            msgRetorno = `😼 Consegui registrar ${refContracheque} de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} bruto</b> para o mês de ${extracao.mes_referencia}! Já incorporei o valor estimado do adiantamento de R$ ${valorAdiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no líquido total (R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).`;
           } else {
-            msgRetorno = `😼 Consegui registrar o contracheque do(a) <b>${nomeDono}</b> de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} bruto</b> para o mês de ${extracao.mes_referencia}! Líquido registrado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`;
+            msgRetorno = `😼 Consegui registrar ${refContracheque} de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} bruto</b> para o mês de ${extracao.mes_referencia}! Líquido registrado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`;
           }
         }
 
