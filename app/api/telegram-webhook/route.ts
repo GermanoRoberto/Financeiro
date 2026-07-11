@@ -100,6 +100,8 @@ async function handleCallbackQuery(callbackQuery: any) {
         transporte: 'transporte',
         saude: 'saúde',
         diversao: 'diversão',
+        receitaextra: 'receita_extra',
+        transferencia: 'transferencia',
         outros: 'outros'
       };
 
@@ -121,9 +123,16 @@ async function handleCallbackQuery(callbackQuery: any) {
 
       if (errFetch || !gasto) throw new Error('Gasto não localizado.');
 
-      await responderCallback(callbackQueryId, 'Gasto categorizado e confirmado!');
+      await responderCallback(callbackQueryId, 'Transação confirmada!');
       
-      const msgEdit = obterFalaAzula(`😼 Gasto de <b>R$ ${gasto.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no <b>${gasto.estabelecimento}</b> classificado como <b>${catDb}</b> e confirmado! Menos dinheiro para o meu papa...`);
+      let msgEdit = '';
+      if (catDb === 'receita_extra') {
+        msgEdit = obterFalaAzula(`😼 Receita extra de <b>R$ ${gasto.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> vinda de <b>${gasto.estabelecimento}</b> confirmada! Mais dinheiro para o meu sachê premium!`);
+      } else if (catDb === 'transferencia') {
+        msgEdit = obterFalaAzula(`😼 Transferência de <b>R$ ${gasto.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> com destino a <b>${gasto.estabelecimento}</b> confirmada! Dinheiro voando entre vocês.`);
+      } else {
+        msgEdit = obterFalaAzula(`😼 Gasto de <b>R$ ${gasto.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no <b>${gasto.estabelecimento}</b> classificado como <b>${catDb}</b> e confirmado! Menos dinheiro para o meu papa...`);
+      }
       await editarMensagem(chatId, messageId, msgEdit);
 
     } else if (data.startsWith('del_')) {
@@ -439,6 +448,9 @@ Se for "comprovante_gasto":
         obterFalaAzula(`😼 Consegui registrar seu contracheque de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Já salvei tudo no painel, incluindo os descontos. Agora vai lá ver o estrago.`)
       );
     } else if (extracao.tipo_documento === 'comprovante_gasto') {
+      const isReceita = extracao.categoria === 'receita_extra';
+      const isTransf = extracao.categoria === 'transferencia';
+
       // Salvar gasto diário como não confirmado
       const { data: gasto, error: errGasto } = await supabase
         .from('gastos_diarios')
@@ -458,8 +470,26 @@ Se for "comprovante_gasto":
         throw new Error('Erro ao salvar gasto diário: ' + (errGasto?.message || 'Sem dados de retorno'));
       }
 
-      const msgText = obterFalaAzula(`😼 Identifiquei um gasto de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no estabelecimento <b>${extracao.estabelecimento}</b>.\n\nEsse gasto foi do quê, meu chapa? Escolha a categoria abaixo para eu registrar:`);
-      await enviarMensagemComBotoes(chatId, msgText, botoesCategorias(gasto.id));
+      if (isReceita) {
+        const msgText = obterFalaAzula(`😼 Identifiquei uma receita extra de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> vinda de <b>${extracao.estabelecimento}</b>.\n\nConfirmar essa entrada de dinheiro para mim?`);
+        await enviarMensagemComBotoes(chatId, msgText, [
+          [
+            { text: '✅ Confirmar Receita', callback_data: `cat_receitaextra_${gasto.id}` },
+            { text: '❌ Excluir', callback_data: `del_${gasto.id}` }
+          ]
+        ]);
+      } else if (isTransf) {
+        const msgText = obterFalaAzula(`😼 Identifiquei uma transferência de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> com destino a <b>${extracao.estabelecimento}</b>.\n\nConfirmar essa transferência?`);
+        await enviarMensagemComBotoes(chatId, msgText, [
+          [
+            { text: '✅ Confirmar Transferência', callback_data: `cat_transferencia_${gasto.id}` },
+            { text: '❌ Excluir', callback_data: `del_${gasto.id}` }
+          ]
+        ]);
+      } else {
+        const msgText = obterFalaAzula(`😼 Identifiquei um gasto de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no estabelecimento <b>${extracao.estabelecimento}</b>.\n\nEsse gasto foi do quê, meu chapa? Escolha a categoria abaixo para eu registrar:`);
+        await enviarMensagemComBotoes(chatId, msgText, botoesCategorias(gasto.id));
+      }
     } else {
       throw new Error('Esse documento não se parece com um contracheque ou comprovante de gasto válido.');
     }
@@ -473,9 +503,9 @@ Se for "comprovante_gasto":
 }
 
 async function gerarConversaAzula(textoUsuario: string): Promise<string> {
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-  if (!GEMINI_API_KEY) {
-    return '😼 Humano... você fala demais. Estou sem bateria para papo furado.';
+  const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
+  if (!GROQ_API_KEY) {
+    return '😼 Humano... você fala demais. Estou sem chave da Groq para papo furado.';
   }
 
   const prompt = `Você é a Azula, uma gata de estimação de pelagem azulada, sarcástica, debochada, possessiva e muito engraçada de um casal.
@@ -492,19 +522,27 @@ Mensagem do usuário: "${textoUsuario}"
 Resposta da Azula (sem preâmbulos, direta e curta):`;
 
   try {
-    const requestBody = {
-      contents: [
-        {
-          parts: [{ text: prompt }]
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 150
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
         }
-      ]
-    };
+      }
+    );
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const response = await axios.post(geminiUrl, requestBody);
-    return response.data.candidates?.[0]?.content?.parts?.[0]?.text || '😼 Bué!';
+    return response.data.choices?.[0]?.message?.content || '😼 Bué!';
   } catch (error) {
-    console.error('Erro ao gerar conversa com Gemini:', error);
+    console.error('Erro ao gerar conversa com Groq:', error);
     return '😼 Bué! Estou com preguiça de conversar agora.';
   }
 }

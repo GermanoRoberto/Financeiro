@@ -33,21 +33,23 @@ const PROMPT_GASTO = `Analise o comprovante de pagamento/recibo de compra/compro
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown ou textos adicionais.
 
 Instruções de Extração:
-1. "valor": O valor total pago ou transferido. Deve ser um número decimal.
-2. "estabelecimento": O nome da empresa, mercado, loja ou pessoa recebedora (credor/beneficiário). Tente identificar o nome fantasia ou razão social.
-3. "categoria": Classifique o gasto em uma das seguintes opções exatas: "alimentação", "transporte", "saúde", "diversão", "outros".
+1. "valor": O valor total pago, transferido ou recebido. Deve ser um número decimal.
+2. "estabelecimento": O nome da empresa, mercado, loja ou pessoa recebedora (credor/beneficiário). Em caso de PIX recebido, coloque o nome do pagador. Em caso de transferência entre o casal, coloque o nome de quem recebeu a transferência (ex: "Para Priscila" ou "Para Germano").
+3. "categoria": Classifique a transação em uma das seguintes opções exatas: "alimentação", "transporte", "saúde", "diversão", "receita_extra", "transferencia", "outros".
    - "alimentação": Supermercados, restaurantes, padarias, iFood, lanchonetes.
    - "transporte": Postos de combustível, Uber, 99, passagens, pedágio, estacionamento.
    - "saúde": Farmácias, médicos, exames, dentistas.
    - "diversão": Cinema, shows, streaming, jogos, viagens de lazer.
-   - "outros": Qualquer gasto que não se encaixe nas categorias acima.
-4. "data": A data em que o gasto foi realizado, no formato "YYYY-MM-DD" (ex: "2026-07-11"). Se não encontrar a data, use a data atual.
+   - "receita_extra": Entradas de dinheiro, PIX recebido de terceiros, bônus, salários adicionais, dinheiro extra ganho (que não seja transferência do próprio cônjuge).
+   - "transferencia": Dinheiro transferido entre o casal (ex: PIX do marido para a esposa, ou da esposa para o marido).
+   - "outros": Qualquer gasto/transação que não se encaixe nas categorias acima.
+4. "data": A data em que o gasto/transação foi realizado, no formato "YYYY-MM-DD" (ex: "2026-07-11"). Se não encontrar a data, use a data atual.
 
 Formato do JSON de retorno esperado:
 {
   "valor": 0.00,
-  "estabelecimento": "Nome do Estabelecimento",
-  "categoria": "alimentação"|"transporte"|"saúde"|"diversão"|"outros",
+  "estabelecimento": "Nome do Estabelecimento ou Recebedor",
+  "categoria": "alimentação"|"transporte"|"saúde"|"diversão"|"receita_extra"|"transferencia"|"outros",
   "data": "YYYY-MM-DD"
 }`;
 
@@ -81,14 +83,21 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
     });
   }
 
+  const payload: any = {
+    model: model,
+    messages: messages,
+    temperature: 0.1
+  };
+
+  // Os modelos de visão da Groq (llama-3.2-11b-vision-preview) NÃO suportam o parâmetro response_format: { type: "json_object" }.
+  // Se for modelo de visão, enviamos sem essa opção e limpamos a resposta de markdown/backticks no javascript.
+  if (model !== 'llama-3.2-11b-vision-preview') {
+    payload.response_format = { type: 'json_object' };
+  }
+
   const response = await axios.post(
     'https://api.groq.com/openai/v1/chat/completions',
-    {
-      model: model,
-      messages: messages,
-      temperature: 0.1,
-      response_format: { type: 'json_object' }
-    },
+    payload,
     {
       headers: {
         'Authorization': `Bearer ${GROQ_API_KEY}`,
@@ -98,20 +107,17 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   );
 
   const textContent = response.data.choices?.[0]?.message?.content || '';
-  return JSON.parse(textContent);
+  const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(jsonStr);
 }
 
 export async function extrairComFallback(base64: string, mimeType: string, prompt: string): Promise<any> {
-  const hasGroqKey = !!(process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY);
-  
   let promptFinal = prompt;
   let base64OrText = base64;
   let mimeTypeFinal = mimeType;
   let isTextOnly = false;
 
   // Se for um arquivo PDF, vamos extrair o texto localmente via pdf-parse.
-  // Isso resolve o problema de enviar binários pesados para as IAs, economiza tokens
-  // e permite que a Groq (que não aceita PDF diretamente) consiga ler as informações perfeitamente!
   if (mimeType === 'application/pdf') {
     try {
       console.log('Extraindo texto do PDF via pdf-parse...');
@@ -133,56 +139,13 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     }
   }
 
-  // 1. Tentar primeiro com a Groq (IA principal para dados/OCR)
-  if (hasGroqKey) {
-    try {
-      console.log('Iniciando extração via Groq (Principal)...');
-      return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
-    } catch (groqError: any) {
-      console.warn(`Erro na Groq (tentando fallback para Gemini): ${groqError.message}`);
-    }
-  }
-
-  // 2. Tentar com Gemini como backup secundário
+  // Usar exclusivamente o Groq (Gemini desativado conforme solicitado pelo usuário para evitar erros de quota 429)
   try {
-    console.log('Iniciando extração via Gemini (Backup)...');
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-    const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent';
-
-    if (!GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY não configurada na Vercel.');
-    }
-
-    const parts: any[] = [{ text: promptFinal }];
-    if (!isTextOnly) {
-      parts.push({
-        inlineData: {
-          mimeType: mimeTypeFinal,
-          data: base64OrText,
-        },
-      });
-    }
-
-    const requestBody = {
-      contents: [
-        {
-          parts: parts,
-        },
-      ],
-    };
-
-    const response = await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-      requestBody
-    );
-
-    const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    return JSON.parse(jsonStr);
-  } catch (geminiError: any) {
-    const errorMsg = geminiError.response?.data?.error?.message || geminiError.message;
-    console.error('Erro também no Gemini:', errorMsg);
-    throw new Error(`Falha na extração de dados. (Erro: ${errorMsg})`);
+    console.log('Iniciando extração exclusiva via Groq...');
+    return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
+  } catch (groqError: any) {
+    console.error('Erro na extração via Groq:', groqError.message);
+    throw new Error(`Falha na extração de dados com Groq. (Erro: ${groqError.message})`);
   }
 }
 

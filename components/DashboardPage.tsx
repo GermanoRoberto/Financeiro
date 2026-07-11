@@ -13,6 +13,9 @@ import UploadContracheque from '@/components/UploadContracheque';
 import CadastroDivida from '@/components/CadastroDivida';
 import GraficosFinanceiros from '@/components/GraficosFinanceiros';
 import VincularTelegram from '@/components/VincularTelegram';
+import CadastroTransacao from '@/components/CadastroTransacao';
+import PainelEmprestimos from '@/components/PainelEmprestimos';
+import RelatorioMensal from '@/components/RelatorioMensal';
 import toast from 'react-hot-toast';
 
 type Visao = 'casal' | 'voce' | 'esposa';
@@ -29,7 +32,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   const [_gastos, setGastos] = useState<GastoDiario[]>([]);
   const [usuarioEsposa, setUsuarioEsposa] = useState<Usuario | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'contracheque' | 'dividas' | 'telegram'>('dashboard');
+  const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'contracheque' | 'dividas' | 'telegram' | 'emprestimos' | 'relatorio'>('dashboard');
   const [contrachequesExpandidos, setContrachequesExpandidos] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -218,7 +221,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
           <div className="flex bg-slate-950/40 p-1.5 rounded-2xl border border-white/5 max-w-full overflow-x-auto self-start md:self-auto">
             <button
               onClick={() => setAbaAtiva('dashboard')}
-              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
                 abaAtiva === 'dashboard'
                   ? 'bg-white text-slate-900 shadow-lg'
                   : 'text-slate-400 hover:text-slate-200'
@@ -228,7 +231,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
             </button>
             <button
               onClick={() => setAbaAtiva('contracheque')}
-              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
                 abaAtiva === 'contracheque'
                   ? 'bg-white text-slate-900 shadow-lg'
                   : 'text-slate-400 hover:text-slate-200'
@@ -237,8 +240,18 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
               📄 Contracheques
             </button>
             <button
+              onClick={() => setAbaAtiva('emprestimos')}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
+                abaAtiva === 'emprestimos'
+                  ? 'bg-white text-slate-900 shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              📈 Empréstimos
+            </button>
+            <button
               onClick={() => setAbaAtiva('dividas')}
-              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
                 abaAtiva === 'dividas'
                   ? 'bg-white text-slate-900 shadow-lg'
                   : 'text-slate-400 hover:text-slate-200'
@@ -247,8 +260,18 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
               💳 Dívidas
             </button>
             <button
+              onClick={() => setAbaAtiva('relatorio')}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
+                abaAtiva === 'relatorio'
+                  ? 'bg-white text-slate-900 shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              📊 Relatório
+            </button>
+            <button
               onClick={() => setAbaAtiva('telegram')}
-              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${
                 abaAtiva === 'telegram'
                   ? 'bg-white text-slate-900 shadow-lg'
                   : 'text-slate-400 hover:text-slate-200'
@@ -290,94 +313,110 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
               {/* Tabela de Prospecção */}
               <TabMeses projecao={projecao} />
 
-              {/* Listagem de Gastos do Telegram (Dia a Dia) */}
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md mt-8">
-                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                  <span>💸</span> Gastos Diários (Enviados via Telegram)
-                </h3>
+              {/* Listagem de Transações do Dia a Dia + Lançamento Manual */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+                <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md">
+                  <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                    <span>💸</span> Transações Diárias (Telegram e Site)
+                  </h3>
 
-                {gastosFiltrados.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    Nenhum gasto do dia a dia registrado para esta visão.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                          <th className="pb-3 pr-4">Estabelecimento</th>
-                          <th className="pb-3 pr-4">Categoria</th>
-                          <th className="pb-3 pr-4">Valor</th>
-                          <th className="pb-3 pr-4">Data</th>
-                          <th className="pb-3 pr-4">Quem gastou</th>
-                          <th className="pb-3 pr-4">Status</th>
-                          <th className="pb-3 text-center">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5 text-sm">
-                        {gastosFiltrados.map((g) => {
-                          const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
-                          const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-                          
-                          const emojisMap: any = {
-                            'alimentação': '🍔',
-                            'transporte': '🚗',
-                            'saúde': '💊',
-                            'diversão': '🎮',
-                            'outros': '📦'
-                          };
-                          const emoji = emojisMap[g.categoria || 'outros'] || '📦';
+                  {gastosFiltrados.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                      Nenhuma transação registrada para esta visão.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                            <th className="pb-3 pr-4">Descrição / Estabelecimento</th>
+                            <th className="pb-3 pr-4">Categoria</th>
+                            <th className="pb-3 pr-4">Valor</th>
+                            <th className="pb-3 pr-4">Data</th>
+                            <th className="pb-3 pr-4">Quem gastou</th>
+                            <th className="pb-3 pr-4">Status</th>
+                            <th className="pb-3 text-center">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-sm">
+                          {gastosFiltrados.map((g) => {
+                            const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
+                            const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                            
+                            const emojisMap: any = {
+                              'alimentação': '🍔',
+                              'transporte': '🚗',
+                              'saúde': '💊',
+                              'diversão': '🎮',
+                              'receita_extra': '💰',
+                              'transferencia': '🔄',
+                              'outros': '📦'
+                            };
+                            const emoji = emojisMap[g.categoria || 'outros'] || '📦';
 
-                          return (
-                            <tr key={g.id} className="hover:bg-white/5 transition-colors">
-                              <td className="py-3.5 pr-4 font-semibold text-white capitalize">{g.estabelecimento || 'Não identificado'}</td>
-                              <td className="py-3.5 pr-4 text-slate-300 capitalize flex items-center gap-1.5">
-                                <span>{emoji}</span> <span>{g.categoria || 'outros'}</span>
-                              </td>
-                              <td className="py-3.5 pr-4 font-bold text-rose-400">
-                                R$ {g.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className="py-3.5 pr-4 text-slate-300">{dataFormatada}</td>
-                              <td className="py-3.5 pr-4">
-                                <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                                  g.usuario_id === usuario.id 
-                                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
-                                    : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
+                            const isReceita = g.categoria === 'receita_extra';
+                            const isTransf = g.categoria === 'transferencia';
+
+                            return (
+                              <tr key={g.id} className="hover:bg-white/5 transition-colors">
+                                <td className="py-3.5 pr-4 font-semibold text-white capitalize">{g.estabelecimento || 'Não identificado'}</td>
+                                <td className="py-3.5 pr-4 text-slate-300 capitalize flex items-center gap-1.5">
+                                  <span>{emoji}</span> <span>{g.categoria?.replace('_', ' ') || 'outros'}</span>
+                                </td>
+                                <td className={`py-3.5 pr-4 font-bold ${
+                                  isReceita 
+                                    ? 'text-emerald-400' 
+                                    : isTransf 
+                                      ? 'text-purple-400' 
+                                      : 'text-rose-400'
                                 }`}>
-                                  {dono}
-                                </span>
-                              </td>
-                              <td className="py-3.5 pr-4">
-                                {g.confirmado ? (
-                                  <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    Confirmado
+                                  {isReceita ? '+ ' : ''}R$ {g.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-3.5 pr-4 text-slate-300">{dataFormatada}</td>
+                                <td className="py-3.5 pr-4">
+                                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                                    g.usuario_id === usuario.id 
+                                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                      : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
+                                  }`}>
+                                    {dono}
                                   </span>
-                                ) : (
+                                </td>
+                                <td className="py-3.5 pr-4">
+                                  {g.confirmado ? (
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                      Confirmado
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => confirmarGasto(g.id)}
+                                      className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors"
+                                      title="Clique para Confirmar"
+                                    >
+                                      Pendente (Confirmar)
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-3.5 text-center">
                                   <button
-                                    onClick={() => confirmarGasto(g.id)}
-                                    className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors"
-                                    title="Clique para Confirmar"
+                                    onClick={() => excluirGasto(g.id)}
+                                    className="p-1.5 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
+                                    title="Excluir Lançamento"
                                   >
-                                    Pendente (Confirmar)
+                                    🗑️
                                   </button>
-                                )}
-                              </td>
-                              <td className="py-3.5 text-center">
-                                <button
-                                  onClick={() => excluirGasto(g.id)}
-                                  className="p-1.5 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
-                                  title="Excluir Gasto"
-                                >
-                                  🗑️
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                <div className="lg:col-span-1">
+                  <CadastroTransacao usuarioId={usuarioAtivo.id} onSuccess={carregarDados} />
+                </div>
               </div>
             </div>
           )}
@@ -584,6 +623,67 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {abaAtiva === 'emprestimos' && (
+            <div className="animate-fadeIn">
+              <PainelEmprestimos 
+                descontos={descontosAtivos.map(d => ({
+                  id: d.id,
+                  tipo: d.tipo,
+                  valor: d.valor,
+                  parcela_atual: d.parcela_atual !== undefined ? d.parcela_atual : null,
+                  parcela_total: d.parcela_total !== undefined ? d.parcela_total : null,
+                  contracheque_id: d.contracheque_id,
+                  usuario_nome: contracheques.find(c => c.id === d.contracheque_id)?.usuario_id === usuario.id ? 'Germano' : (usuarioEsposa?.nome || 'Priscila'),
+                  usuario_id: contracheques.find(c => c.id === d.contracheque_id)?.usuario_id || '',
+                  mes_referencia: contracheques.find(c => c.id === d.contracheque_id)?.mes_referencia || ''
+                }))}
+                dividas={dividasAtivas.map(d => ({
+                  id: d.id,
+                  credor: d.credor,
+                  valor_total: d.valor_total !== undefined ? d.valor_total : null,
+                  valor_parcela: d.valor_parcela,
+                  parcelas_restantes: d.parcelas_restantes !== undefined ? d.parcelas_restantes : null,
+                  usuario_id: d.usuario_id !== undefined ? d.usuario_id : null,
+                  usuario_nome: d.usuario_id === null ? 'Conjunta' : d.usuario_id === usuario.id ? 'Germano' : (usuarioEsposa?.nome || 'Priscila')
+                }))}
+                visao={visao}
+              />
+            </div>
+          )}
+
+          {abaAtiva === 'relatorio' && (
+            <div className="animate-fadeIn">
+              <RelatorioMensal 
+                contracheques={contrachequesAtivos.map(c => ({
+                  id: c.id,
+                  mes_referencia: c.mes_referencia,
+                  salario_bruto: c.salario_bruto || 0,
+                  salario_liquido: c.salario_liquido || 0,
+                  usuario_nome: c.usuario_id === usuario.id ? 'Germano' : (usuarioEsposa?.nome || 'Priscila'),
+                  usuario_id: c.usuario_id
+                }))}
+                gastos={gastosFiltrados.map(g => ({
+                  id: g.id,
+                  valor: g.valor,
+                  estabelecimento: g.estabelecimento || 'Não identificado',
+                  categoria: g.categoria || 'outros',
+                  data: g.data,
+                  confirmado: g.confirmado,
+                  usuario_nome: g.usuario_id === usuario.id ? 'Germano' : (usuarioEsposa?.nome || 'Priscila'),
+                  usuario_id: g.usuario_id
+                }))}
+                dividas={dividasAtivas.map(d => ({
+                  id: d.id,
+                  credor: d.credor,
+                  valor_parcela: d.valor_parcela,
+                  usuario_id: d.usuario_id !== undefined ? d.usuario_id : null,
+                  usuario_nome: d.usuario_id === null ? 'Conjunta' : d.usuario_id === usuario.id ? 'Germano' : (usuarioEsposa?.nome || 'Priscila')
+                }))}
+                visao={visao}
+              />
             </div>
           )}
 
