@@ -380,6 +380,7 @@ Formato esperado:
 Se for "contracheque":
 {
   "tipo_documento": "contracheque",
+  "nome_funcionario": string|null (Nome completo do funcionário/trabalhador no cabeçalho do documento, ex: "GERMANO ROBERTO DE LIMA BARRETO"),
   "is_adiantamento": boolean (true se for um demonstrativo de Adiantamento Quinzenal / vale, senão false),
   "salario_bruto": number (Identifique o valor total de proventos/ganhos antes dos descontos),
   "salario_liquido": number (Identifique o líquido a receber/valor final pago em conta),
@@ -428,17 +429,38 @@ Se for "contratos_emprestimo":
         mesRef = `${mesRef}-01`;
       }
 
+      // Buscar todos os usuários cadastrados para cruzar o nome do cabeçalho
+      const { data: todosUsuarios } = await supabase
+        .from('usuarios_permitidos')
+        .select('*');
+
+      let usuarioDonoId = usuario.id;
+      let nomeDono = usuario.nome;
+
+      if (extracao.nome_funcionario && todosUsuarios && todosUsuarios.length > 0) {
+        const funcionarioUpper = extracao.nome_funcionario.toUpperCase();
+        const matchingUser = todosUsuarios.find(u => {
+          const uNomeUpper = u.nome.toUpperCase();
+          return funcionarioUpper.includes(uNomeUpper) || uNomeUpper.includes(funcionarioUpper);
+        });
+
+        if (matchingUser) {
+          usuarioDonoId = matchingUser.id;
+          nomeDono = matchingUser.nome;
+        }
+      }
+
       // Detecção inteligente de Adiantamento/Vale
       const isAdiantamento = extracao.is_adiantamento || 
         extracao.descontos?.some((d: any) => d.tipo.toUpperCase().includes('ADIANTAMENTO') && d.valor === 0) ||
         (extracao.salario_bruto === extracao.salario_liquido && extracao.salario_liquido > 0 && (!extracao.descontos || extracao.descontos.length === 0)) ||
         (extracao.salario_bruto === 1400 && extracao.salario_liquido === 1400);
 
-      // Procurar contracheque existente para o mesmo mês
+      // Procurar contracheque existente para o mesmo mês do respectivo dono
       const { data: ccExistente } = await supabase
         .from('contracheques')
         .select('*')
-        .eq('usuario_id', usuario.id)
+        .eq('usuario_id', usuarioDonoId)
         .eq('mes_referencia', mesRef)
         .maybeSingle();
 
@@ -461,7 +483,7 @@ Se for "contratos_emprestimo":
           if (novoLiquido < novoBruto && !ccExistente.dados_brutos?.tem_adiantamento_somado) {
             novoLiquido = Number(novoLiquido) + Number(extracao.salario_liquido || 0);
           }
-          msgRetorno = `😼 Registrei seu <b>Adiantamento de R$ ${extracao.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}. Ele foi integrado ao seu contracheque mensal existente!`;
+          msgRetorno = `😼 Registrei o <b>Adiantamento de R$ ${extracao.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> do(a) <b>${nomeDono}</b> para o mês de ${extracao.mes_referencia}. Ele foi integrado ao contracheque mensal existente!`;
         } else {
           // Se estamos subindo o holerite mensal e já existia o adiantamento
           novoBruto = extracao.salario_bruto || 0;
@@ -469,7 +491,7 @@ Se for "contratos_emprestimo":
           // O líquido total será a soma dos dois líquidos
           novoLiquido = Number(ccExistente.salario_liquido) + Number(liquidoMensal);
           
-          msgRetorno = `😼 Registrei seu contracheque mensal de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para ${extracao.mes_referencia}. Ele foi mesclado com o adiantamento já existente, totalizando <b>R$ ${novoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} líquido</b> no mês!`;
+          msgRetorno = `😼 Registrei o contracheque mensal do(a) <b>${nomeDono}</b> de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para ${extracao.mes_referencia}. Ele foi mesclado com o adiantamento já existente, totalizando <b>R$ ${novoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} líquido</b> no mês!`;
         }
 
         // Atualizar contracheque existente
@@ -514,17 +536,17 @@ Se for "contratos_emprestimo":
         if (!isAdiantamento && valorAdiantamento > 0) {
           // Se for o mensal e tiver desconto de adiantamento na folha, já somamos ao líquido
           liquido = Number(liquido) + valorAdiantamento;
-          msgRetorno = `😼 Consegui registrar seu contracheque de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Já incorporei o valor do adiantamento de R$ ${valorAdiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no líquido total (R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).`;
+          msgRetorno = `😼 Consegui registrar o contracheque do(a) <b>${nomeDono}</b> de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Já incorporei o valor do adiantamento de R$ ${valorAdiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no líquido total (R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).`;
         } else if (isAdiantamento) {
-          msgRetorno = `😼 Registrei seu <b>Adiantamento de R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}. Quando você subir o contracheque mensal, eu mesclarei ambos automaticamente!`;
+          msgRetorno = `😼 Registrei o <b>Adiantamento de R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> do(a) <b>${nomeDono}</b> para o mês de ${extracao.mes_referencia}. Quando você subir o contracheque mensal, eu mesclarei ambos automaticamente!`;
         } else {
-          msgRetorno = `😼 Consegui registrar seu contracheque de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Líquido registrado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`;
+          msgRetorno = `😼 Consegui registrar o contracheque do(a) <b>${nomeDono}</b> de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Líquido registrado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`;
         }
 
         const { data: cc, error: errCc } = await supabase
           .from('contracheques')
           .insert({
-            usuario_id: usuario.id,
+            usuario_id: usuarioDonoId,
             mes_referencia: mesRef,
             salario_bruto: bruto,
             salario_liquido: liquido,
