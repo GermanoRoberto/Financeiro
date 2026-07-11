@@ -381,14 +381,14 @@ Se for "contracheque":
 {
   "tipo_documento": "contracheque",
   "nome_funcionario": string|null (Nome completo do funcionário/trabalhador no cabeçalho do documento, ex: "GERMANO ROBERTO DE LIMA BARRETO"),
-  "is_adiantamento": boolean (true se for um demonstrativo de Adiantamento Quinzenal / vale, senão false),
-  "salario_bruto": number (Identifique o valor total de proventos/ganhos antes dos descontos),
-  "salario_liquido": number (Identifique o líquido a receber/valor final pago em conta),
-  "mes_referencia": "YYYY-MM" (Mês e ano do contracheque, ex: "2026-07"),
+  "is_adiantamento": boolean (true se for um demonstrativo de Adiantamento Quinzenal / vale, senão false. Dica: Se o título for 'Adiantamento Quinzenal' ou se os Proventos forem iguais ao Líquido e houver poucos ou nenhum desconto, marque true),
+  "salario_bruto": number (Identifique o valor total de PROVENTOS/GANHOS, também chamado de 'Total de Proventos' ou 'Total de Vencimentos', antes de qualquer desconto. ATENÇÃO: NÃO confunda o salário bruto com o Salário Base. O salário bruto é a soma total de Proventos no rodapé, ex: 3907.89),
+  "salario_liquido": number (Identifique o valor líquido recebido, também chamado de 'Valor líquido' ou 'Líquido a receber' no rodapé. ATENÇÃO: O valor líquido do mensal é ex: 920.00, do adiantamento é ex: 993.00. NÃO confunda 'Descontos' ou 'Total de Descontos' como 2987.89 com o valor líquido!),
+  "mes_referencia": "YYYY-MM" (Mês e ano do contracheque, ex: "2026-06"),
   "descontos": [
     {
       "tipo": string (Nome amigável do desconto, ex: "INSS", "IRRF", "Plano de Saúde", "Empréstimo"),
-      "valor": number (Valor absoluto do desconto),
+      "valor": number (Valor absoluto do desconto como número decimal. ATENÇÃO: Cada linha de evento segue o formato [Código] [Descrição] [Índice/Referência] [Proventos] [Descontos]. O campo Índice/Referência (ex: 40,00 ou 30,00) NÃO é um valor financeiro de desconto, ignore-o! Extraia apenas valores da coluna real de Descontos, ex: 407.26),
       "parcela_atual": number|null (Se for parcelado/empréstimo, ex: 2 no "02/12"),
       "parcela_total": number|null (Total de parcelas, ex: 12 no "02/12"),
       "recorrente": boolean (true se for mensal recorrente como INSS, Plano de Saúde, senão false)
@@ -439,14 +439,21 @@ Se for "contratos_emprestimo":
 
       if (extracao.nome_funcionario && todosUsuarios && todosUsuarios.length > 0) {
         const funcionarioUpper = extracao.nome_funcionario.toUpperCase();
-        const matchingUser = todosUsuarios.find(u => {
-          const uNomeUpper = u.nome.toUpperCase();
-          return funcionarioUpper.includes(uNomeUpper) || uNomeUpper.includes(funcionarioUpper);
-        });
+        const remetenteNomeUpper = usuario.nome.toUpperCase();
+        
+        if (funcionarioUpper.includes(remetenteNomeUpper)) {
+          usuarioDonoId = usuario.id;
+          nomeDono = usuario.nome;
+        } else {
+          const matchingUser = todosUsuarios.find(u => {
+            const uNomeUpper = u.nome.toUpperCase();
+            return funcionarioUpper.includes(uNomeUpper) || uNomeUpper.includes(funcionarioUpper);
+          });
 
-        if (matchingUser) {
-          usuarioDonoId = matchingUser.id;
-          nomeDono = matchingUser.nome;
+          if (matchingUser) {
+            usuarioDonoId = matchingUser.id;
+            nomeDono = matchingUser.nome;
+          }
         }
       }
 
