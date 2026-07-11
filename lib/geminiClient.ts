@@ -144,8 +144,8 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     console.log('Iniciando extração exclusiva via Groq...');
     return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
   } catch (groqError: any) {
-    console.error('Erro na extração via Groq:', groqError.message);
-    throw new Error(`Falha na extração de dados com Groq. (Erro: ${groqError.message})`);
+    const errorDetails = groqError.response?.data?.error?.message || groqError.message;
+    throw new Error(`Falha na extração de dados com Groq. (Erro: ${errorDetails})`);
   }
 }
 
