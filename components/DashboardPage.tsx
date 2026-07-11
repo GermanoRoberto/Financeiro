@@ -30,6 +30,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   const [usuarioEsposa, setUsuarioEsposa] = useState<Usuario | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'contracheque' | 'dividas' | 'telegram'>('dashboard');
+  const [contrachequesExpandidos, setContrachequesExpandidos] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     carregarDados();
@@ -39,7 +40,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     try {
       setCarregando(true);
 
-      // Carregar dados de ambos os usuários (já que RLS agora permite leitura compartilhada)
+      // Carregar dados de ambos os usuários
       const { data: contratachequeData } = await supabase
         .from('contracheques')
         .select('*')
@@ -111,10 +112,17 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     return contrachequeUserId === usuarioAtivo.id;
   });
 
+  // Filtrar dividas conforme a visão
   const dividasAtivas = dividas.filter((d) => {
     if (visao === 'casal') return true;
     if (d.usuario_id === null) return true; // dívida conjunta
     return d.usuario_id === usuarioAtivo.id;
+  });
+
+  // Filtrar gastos conforme a visão
+  const gastosFiltrados = _gastos.filter((g) => {
+    if (visao === 'casal') return true;
+    return g.usuario_id === usuarioAtivo.id;
   });
 
   const totalDescontos = descontosAtivos.reduce((acc, d) => acc + (d.valor || 0), 0);
@@ -124,6 +132,61 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const toggleContracheque = (id: string) => {
+    setContrachequesExpandidos(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // Funções de Exclusão e Confirmação
+  const excluirContracheque = async (id: string) => {
+    if (!confirm('Deseja realmente excluir este contracheque? Todos os descontos associados também serão excluídos.')) return;
+    try {
+      const { error } = await supabase.from('contracheques').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Contracheque excluído com sucesso!');
+      carregarDados();
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + err.message);
+    }
+  };
+
+  const excluirDivida = async (id: string) => {
+    if (!confirm('Deseja realmente excluir esta dívida?')) return;
+    try {
+      const { error } = await supabase.from('dividas').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Dívida excluída com sucesso!');
+      carregarDados();
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + err.message);
+    }
+  };
+
+  const excluirGasto = async (id: string) => {
+    if (!confirm('Deseja realmente excluir este gasto?')) return;
+    try {
+      const { error } = await supabase.from('gastos_diarios').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Gasto excluído com sucesso!');
+      carregarDados();
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + err.message);
+    }
+  };
+
+  const confirmarGasto = async (id: string) => {
+    try {
+      const { error } = await supabase.from('gastos_diarios').update({ confirmado: true }).eq('id', id);
+      if (error) throw error;
+      toast.success('Gasto confirmado!');
+      carregarDados();
+    } catch (err: any) {
+      toast.error('Erro ao confirmar: ' + err.message);
+    }
   };
 
   if (carregando) {
@@ -137,7 +200,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-tr from-[#021f54] via-[#0946b5] to-[#120436] text-slate-100 font-sans relative overflow-x-hidden">
       
-      {/* Círculos de Brilho / Gradiente em Segundo Plano (Glow Effect) */}
+      {/* Círculos de Brilho em Segundo Plano (Glow Effect) */}
       <div className="absolute top-20 left-10 w-96 h-96 rounded-full bg-blue-500/10 filter blur-[100px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-[500px] h-[500px] rounded-full bg-indigo-500/10 filter blur-[120px] pointer-events-none" />
 
@@ -226,18 +289,301 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
               {/* Tabela de Prospecção */}
               <TabMeses projecao={projecao} />
+
+              {/* Listagem de Gastos do Telegram (Dia a Dia) */}
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md mt-8">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <span>💸</span> Gastos Diários (Enviados via Telegram)
+                </h3>
+
+                {gastosFiltrados.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    Nenhum gasto do dia a dia registrado para esta visão.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          <th className="pb-3 pr-4">Estabelecimento</th>
+                          <th className="pb-3 pr-4">Categoria</th>
+                          <th className="pb-3 pr-4">Valor</th>
+                          <th className="pb-3 pr-4">Data</th>
+                          <th className="pb-3 pr-4">Quem gastou</th>
+                          <th className="pb-3 pr-4">Status</th>
+                          <th className="pb-3 text-center">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-sm">
+                        {gastosFiltrados.map((g) => {
+                          const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
+                          const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                          
+                          const emojisMap: any = {
+                            'alimentação': '🍔',
+                            'transporte': '🚗',
+                            'saúde': '💊',
+                            'diversão': '🎮',
+                            'outros': '📦'
+                          };
+                          const emoji = emojisMap[g.categoria || 'outros'] || '📦';
+
+                          return (
+                            <tr key={g.id} className="hover:bg-white/5 transition-colors">
+                              <td className="py-3.5 pr-4 font-semibold text-white capitalize">{g.estabelecimento || 'Não identificado'}</td>
+                              <td className="py-3.5 pr-4 text-slate-300 capitalize flex items-center gap-1.5">
+                                <span>{emoji}</span> <span>{g.categoria || 'outros'}</span>
+                              </td>
+                              <td className="py-3.5 pr-4 font-bold text-rose-400">
+                                R$ {g.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-3.5 pr-4 text-slate-300">{dataFormatada}</td>
+                              <td className="py-3.5 pr-4">
+                                <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                                  g.usuario_id === usuario.id 
+                                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                    : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
+                                }`}>
+                                  {dono}
+                                </span>
+                              </td>
+                              <td className="py-3.5 pr-4">
+                                {g.confirmado ? (
+                                  <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    Confirmado
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => confirmarGasto(g.id)}
+                                    className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors"
+                                    title="Clique para Confirmar"
+                                  >
+                                    Pendente (Confirmar)
+                                  </button>
+                                )}
+                              </td>
+                              <td className="py-3.5 text-center">
+                                <button
+                                  onClick={() => excluirGasto(g.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
+                                  title="Excluir Gasto"
+                                >
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {abaAtiva === 'contracheque' && (
-            <div className="animate-fadeIn max-w-3xl mx-auto">
-              <UploadContracheque usuarioId={usuarioAtivo.id} onUploadSuccess={carregarDados} />
+            <div className="animate-fadeIn">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-1">
+                  <UploadContracheque usuarioId={usuarioAtivo.id} onUploadSuccess={carregarDados} />
+                </div>
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md">
+                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                      <span>📄</span> Contracheques Cadastrados ({visao === 'casal' ? 'Casal' : visao === 'voce' ? 'Você' : 'Esposa'})
+                    </h3>
+                    
+                    {contrachequesAtivos.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        Nenhum contracheque cadastrado para esta visão.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {contrachequesAtivos.map((cc) => {
+                          const dono = cc.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
+                          const dataFormatada = new Date(cc.mes_referencia).toLocaleDateString('pt-BR', {
+                            month: 'long',
+                            year: 'numeric',
+                            timeZone: 'UTC'
+                          });
+                          const descontosCc = descontos.filter(d => d.contracheque_id === cc.id);
+                          const totalDescontosCc = descontosCc.reduce((acc, d) => acc + (d.valor || 0), 0);
+                          const isExpandido = !!contrachequesExpandidos[cc.id];
+
+                          return (
+                            <div key={cc.id} className="border border-white/5 bg-slate-950/40 rounded-2xl overflow-hidden transition-all duration-300 hover:border-white/10">
+                              <div className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 cursor-pointer hover:bg-white/5 transition-colors"
+                                onClick={() => toggleContracheque(cc.id)}
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg font-bold text-white capitalize">{dataFormatada}</span>
+                                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                                      cc.usuario_id === usuario.id 
+                                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                        : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
+                                    }`}>
+                                      {dono}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-slate-400">
+                                    Salário Base / Líquido e {descontosCc.length} descontos
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-6 self-end sm:self-auto">
+                                  <div className="text-right">
+                                    <div className="text-xs text-slate-400">Líquido</div>
+                                    <div className="text-sm font-bold text-emerald-400">
+                                      R$ {cc.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-xs text-slate-400">Bruto</div>
+                                    <div className="text-sm font-bold text-slate-300">
+                                      R$ {cc.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        excluirContracheque(cc.id);
+                                      }}
+                                      className="p-2 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
+                                      title="Excluir Contracheque"
+                                    >
+                                      🗑️
+                                    </button>
+                                    <span className="text-slate-400 transition-transform duration-300 transform"
+                                      style={{ transform: isExpandido ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                                    >
+                                      ▼
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {isExpandido && (
+                                <div className="px-5 pb-5 pt-2 border-t border-white/5 bg-slate-950/20">
+                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalhamento de Descontos</h4>
+                                  {descontosCc.length === 0 ? (
+                                    <p className="text-xs text-slate-500">Sem descontos registrados neste contracheque.</p>
+                                  ) : (
+                                    <div className="divide-y divide-white/5">
+                                      {descontosCc.map((d) => (
+                                        <div key={d.id} className="py-2.5 flex items-center justify-between text-sm">
+                                          <div className="space-y-0.5">
+                                            <span className="font-semibold text-slate-200 capitalize">{d.tipo}</span>
+                                            {d.parcela_atual && d.parcela_total && (
+                                              <span className="ml-2 text-xs text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded">
+                                                Parc. {d.parcela_atual}/{d.parcela_total}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span className="font-bold text-rose-400">
+                                            R$ {d.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      <div className="pt-3 flex justify-between text-sm font-bold text-slate-300">
+                                        <span>Total Descontos</span>
+                                        <span className="text-rose-400">
+                                          R$ {totalDescontosCc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {abaAtiva === 'dividas' && (
-            <div className="animate-fadeIn max-w-3xl mx-auto">
-              <CadastroDivida usuarioId={usuarioAtivo.id} onSuccess={carregarDados} />
+            <div className="animate-fadeIn">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-1">
+                  <CadastroDivida usuarioId={usuarioAtivo.id} onSuccess={carregarDados} />
+                </div>
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md">
+                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                      <span>💳</span> Dívidas Cadastradas ({visao === 'casal' ? 'Casal' : visao === 'voce' ? 'Você' : 'Esposa'})
+                    </h3>
+
+                    {dividasAtivas.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        Nenhuma dívida cadastrada para esta visão.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                              <th className="pb-3 pr-4">Credor</th>
+                              <th className="pb-3 pr-4">Valor Total</th>
+                              <th className="pb-3 pr-4">Valor Parcela</th>
+                              <th className="pb-3 pr-4 text-center">Restantes</th>
+                              <th className="pb-3 pr-4">Dono</th>
+                              <th className="pb-3 text-center">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5 text-sm">
+                            {dividasAtivas.map((d) => {
+                              const dono = d.usuario_id === null 
+                                ? 'Conjunta' 
+                                : (d.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa'));
+                              const totalPendente = d.valor_total || (d.valor_parcela * (d.parcelas_restantes || 1));
+
+                              return (
+                                <tr key={d.id} className="hover:bg-white/5 transition-colors">
+                                  <td className="py-3.5 pr-4 font-semibold text-white">{d.credor}</td>
+                                  <td className="py-3.5 pr-4 text-slate-300">
+                                    R$ {totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-3.5 pr-4 font-bold text-rose-400">
+                                    R$ {d.valor_parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-3.5 pr-4 text-center text-slate-300">{d.parcelas_restantes ?? '-'}</td>
+                                  <td className="py-3.5 pr-4">
+                                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                                      d.usuario_id === null
+                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                        : d.usuario_id === usuario.id
+                                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                          : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
+                                    }`}>
+                                      {dono}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 text-center">
+                                    <button
+                                      onClick={() => excluirDivida(d.id)}
+                                      className="p-1.5 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
+                                      title="Excluir Dívida"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
