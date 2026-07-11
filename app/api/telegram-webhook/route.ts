@@ -387,14 +387,20 @@ Se for "contracheque":
   "mes_referencia": "YYYY-MM" (Mês e ano do contracheque, ex: "2026-06"),
   "descontos": [
     {
-      "tipo": string (Nome amigável do desconto, ex: "INSS", "IRRF", "Plano de Saúde", "Empréstimo"),
-      "valor": number (Valor absoluto do desconto como número decimal. ATENÇÃO: Cada linha de evento segue o formato [Código] [Descrição] [Índice/Referência] [Proventos] [Descontos]. O campo Índice/Referência (ex: 40,00 ou 30,00) NÃO é um valor financeiro de desconto, ignore-o! Extraia apenas valores da coluna real de Descontos, ex: 407.26),
+      "tipo": string (Nome amigável do desconto, ex: "INSS", "IRRF", "Plano de Saúde", "Empréstimo", "Previdência Municipal (FPM)"). ATENÇÃO: Extraia TODOS os descontos do documento. No contracheque da Prefeitura de Juiz de Fora, a rubrica "FPM (FOLHA)" ou "FPM" é a previdência municipal dos servidores, que é um DESCONTO obrigatório e deve ser extraído com o tipo "Previdência Municipal (FPM)"!),
+      "valor": number (Valor absoluto do desconto como número decimal. ATENÇÃO: Cada linha de evento segue o formato [Código] [Descrição] [Índice/Referência] [Proventos] [Descontos]. O campo Índice/Referência (ex: 14,0000 ou 30,00) NÃO é um valor financeiro de desconto, ignore-o! Extraia apenas valores da coluna real de Descontos, ex: 925.40),
       "parcela_atual": number|null (Se for parcelado/empréstimo, ex: 2 no "02/12"),
       "parcela_total": number|null (Total de parcelas, ex: 12 no "02/12"),
-      "recorrente": boolean (true se for mensal recorrente como INSS, Plano de Saúde, senão false)
+      "recorrente": boolean (true se for mensal recorrente como INSS, FPM, Plano de Saúde, senão false)
     }
   ]
 }
+
+REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA:
+1. O salario_bruto (Total de Proventos) deve ser exatamente igual à soma dos proventos individuais do documento.
+2. A soma dos descontos individuais na lista "descontos" deve ser exatamente igual ao total de descontos do documento (ex: 3814.14).
+3. O salario_liquido deve ser exatamente igual a (salario_bruto - soma de todos os descontos).
+Use essas regras matemáticas para validar os números extraídos. Se faltar algum valor na lista de descontos para fechar a conta do líquido, encontre qual linha de desconto foi omitida (ex: "FPM (FOLHA)") e adicione-a à lista.
 
 Se for "comprovante_gasto":
 {

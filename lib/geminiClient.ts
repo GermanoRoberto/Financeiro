@@ -4,15 +4,22 @@ const PROMPT_CONTRACHEQUE = `Analise detalhadamente o contracheque/holerite bras
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown (sem \`\`\`json) ou textos adicionais.
 
 Instruções de Extração:
-1. "salario_bruto": Identifique o valor total de proventos (também chamado de "Total de Vencimentos", "Total de Proventos" ou a soma de todos os ganhos antes dos descontos). Deve ser um número decimal.
+1. "salario_bruto": Identifique o valor total de proventos (também chamado de "Total de Vencimentos", "Total de Proventos" ou a soma de todos os ganhos antes dos descontos). Deve ser um número decimal. NÃO confunda com o Salário Base.
 2. "salario_liquido": Identifique o valor líquido a receber (também chamado de "Líquido a Receber", "Total Líquido", "Valor Líquido" ou o valor final depositado em conta). Deve ser um número decimal.
 3. "descontos": Uma lista com todos os descontos aplicados (itens sob a coluna "Descontos" ou que representem deduções, como INSS, IRRF, Plano de Saúde, Vale Transporte, Vale Refeição, Empréstimos, Coparticipação, Sindicato, etc.).
+   ATENÇÃO: Extraia TODOS os descontos do documento. No contracheque da Prefeitura de Juiz de Fora, a rubrica "FPM (FOLHA)" ou "FPM" é a previdência municipal dos servidores, que é um DESCONTO obrigatório e deve ser extraído com o tipo "Previdência Municipal (FPM)"!
    Para cada desconto, extraia:
-   - "tipo": O nome amigável do desconto (ex: "INSS", "IRRF", "Plano de Saúde", "Empréstimo Consignado", "Vale Transporte").
-   - "valor": O valor absoluto do desconto como número decimal.
+   - "tipo": O nome amigável do desconto (ex: "INSS", "IRRF", "Plano de Saúde", "Empréstimo Consignado", "Previdência Municipal (FPM)").
+   - "valor": O valor absoluto do desconto como número decimal. ATENÇÃO: Cada linha de evento segue o formato [Código] [Descrição] [Índice/Referência] [Proventos] [Descontos]. O campo Índice/Referência (ex: 14,0000) não é um desconto, ignore-o! Extraia apenas o valor da coluna real de Descontos, ex: 925.40.
    - "parcela_atual": Se for um desconto parcelado (ex: empréstimos que mostram "02/12" ou "parc 3 de 10" na descrição), extraia o número da parcela atual. Caso contrário, retorne null.
    - "parcela_total": O número total de parcelas (ex: 12 ou 10 no exemplo anterior). Caso contrário, retorne null.
-   - "recorrente": Um booleano indicando se é um desconto recorrente (mensal permanente como INSS, IRRF, Plano de Saúde, coparticipação padrão) ou não (como empréstimos parcelados, adiantamentos pontuais).
+   - "recorrente": Um booleano indicando se é um desconto recorrente (mensal permanente como INSS, FPM, Plano de Saúde, coparticipação padrão) ou não (como empréstimos parcelados, adiantamentos pontuais).
+
+REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA:
+1. O salario_bruto (Total de Proventos) deve ser exatamente igual à soma dos proventos individuais do documento.
+2. A soma dos descontos individuais na lista "descontos" deve ser exatamente igual ao total de descontos do documento (ex: 3814.14).
+3. O salario_liquido deve ser exatamente igual a (salario_bruto - soma de todos os descontos).
+Use essas regras matemáticas para validar os números extraídos. Se faltar algum valor na lista de descontos para fechar a conta do líquido, encontre qual linha de desconto foi omitida (ex: "FPM (FOLHA)") e adicione-a à lista.
 
 Formato do JSON de retorno esperado:
 {
