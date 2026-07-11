@@ -133,9 +133,12 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
         isTextOnly = true;
         promptFinal = `${prompt}\n\n[Texto extraído do PDF]:\n${base64OrText}`;
         console.log(`Texto extraído do PDF com sucesso (${base64OrText.length} caracteres).`);
+      } else {
+        throw new Error('O PDF parece estar vazio ou não possui texto copiável (pode ser um documento escaneado/imagem).');
       }
     } catch (pdfError: any) {
-      console.warn(`Erro ao extrair texto do PDF via pdf-parse: ${pdfError.message}. Enviando PDF binário original.`);
+      console.error(`Erro ao extrair texto do PDF via pdf-parse: ${pdfError.message}`);
+      throw new Error(`Não consegui ler as informações do PDF. Certifique-se de que o PDF tem texto selecionável e não é uma imagem escaneada. (Erro: ${pdfError.message})`);
     }
   }
 
