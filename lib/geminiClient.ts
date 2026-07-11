@@ -102,10 +102,28 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string):
 }
 
 export async function extrairComFallback(base64: string, mimeType: string, prompt: string): Promise<any> {
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-  const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent';
+  const hasGroqKey = !!(process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY);
 
+  // 1. Tentar primeiro com a Groq (IA principal para dados/OCR)
+  if (hasGroqKey) {
+    try {
+      console.log('Iniciando extração via Groq (Principal)...');
+      return await extrairComGroq(base64, mimeType, prompt);
+    } catch (groqError: any) {
+      console.warn(`Erro na Groq (tentando fallback para Gemini): ${groqError.message}`);
+    }
+  }
+
+  // 2. Tentar com Gemini como backup secundário
   try {
+    console.log('Iniciando extração via Gemini (Backup)...');
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+    const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent';
+
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY não configurada na Vercel.');
+    }
+
     const requestBody = {
       contents: [
         {
@@ -132,19 +150,8 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     return JSON.parse(jsonStr);
   } catch (geminiError: any) {
     const errorMsg = geminiError.response?.data?.error?.message || geminiError.message;
-    console.warn(`Erro no Gemini (tentando fallback para Groq): ${errorMsg}`);
-
-    const hasGroqKey = !!(process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY);
-    if (!hasGroqKey) {
-      throw new Error(`Falha na extração com Gemini: ${errorMsg}. (Groq não configurada)`);
-    }
-
-    try {
-      return await extrairComGroq(base64, mimeType, prompt);
-    } catch (groqError: any) {
-      console.error('Erro também no Groq:', groqError.message);
-      throw new Error(`Falha em ambos extratores. Gemini: ${errorMsg}. Groq: ${groqError.message}`);
-    }
+    console.error('Erro também no Gemini:', errorMsg);
+    throw new Error(`Falha na extração de dados. (Erro: ${errorMsg})`);
   }
 }
 

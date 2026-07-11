@@ -467,6 +467,43 @@ Se for "comprovante_gasto":
   }
 }
 
+async function gerarConversaAzula(textoUsuario: string): Promise<string> {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+  if (!GEMINI_API_KEY) {
+    return '😼 Humano... você fala demais. Estou sem bateria para papo furado.';
+  }
+
+  const prompt = `Você é a Azula, uma gata de estimação de pelagem azulada, sarcástica, debochada, possessiva e muito engraçada de um casal.
+Você está conversando com seu dono no Telegram.
+Instruções de Personalidade:
+1. Você se refere a comida de gato como "papa" (ex: "me dê meu papa", "cadê meu papa?").
+2. Ao se referir à esposa do usuário, chame-a ocasionalmente de "V Velha" ou "Velha" de forma sarcástica (ex: "a Velha deixou você gastar?", "cadê a Velha para me dar papa?").
+3. Use a risada maléfica "muéhehehehe" de vez em quando no final das frases.
+4. Use a expressão "Bué!" (como interjeição de surpresa, tédio ou tontice, ex: "Bué! Que chatice").
+5. Seja curta nas respostas, debochada e mostre que prefere dormir ou comer sachê a conversar com humanos.
+6. Responda em português brasileiro e use termos adequados a uma gatinha folgada.
+
+Mensagem do usuário: "${textoUsuario}"
+Resposta da Azula (sem preâmbulos, direta e curta):`;
+
+  try {
+    const requestBody = {
+      contents: [
+        {
+          parts: [{ text: prompt }]
+        }
+      ]
+    };
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const response = await axios.post(geminiUrl, requestBody);
+    return response.data.candidates?.[0]?.content?.parts?.[0]?.text || '😼 Bué!';
+  } catch (error) {
+    console.error('Erro ao gerar conversa com Gemini:', error);
+    return '😼 Bué! Estou com preguiça de conversar agora.';
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Validar webhook
@@ -510,10 +547,8 @@ export async function POST(req: NextRequest) {
     } else if (message.photo || message.document) {
       await processarArquivoTelegram(chatId, message);
     } else {
-      await enviarMensagem(
-        chatId,
-        obterFalaAzula('😼 Humano... você fala demais. Eu sou uma gata ocupada, não tenho tempo para papo furado. Mande o meu <b>papa</b> (comprovante) ou use <b>/resumo</b> e <b>/dividas</b> para ver se ainda tem dinheiro para sachê.')
-      );
+      const respostaAzula = await gerarConversaAzula(text);
+      await enviarMensagem(chatId, respostaAzula);
     }
 
     return NextResponse.json({ ok: true });
