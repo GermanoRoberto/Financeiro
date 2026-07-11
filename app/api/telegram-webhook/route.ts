@@ -372,7 +372,7 @@ async function processarArquivoTelegram(chatId: number, message: any) {
     const base64 = buffer.toString('base64');
 
     // 3. Prompt para o Gemini / Groq com instruções detalhadas
-    const prompt = `Analise este documento/imagem e classifique-o em "contracheque" ou "comprovante_gasto".
+    const prompt = `Analise este documento/imagem e classifique-o em "contracheque", "comprovante_gasto" ou "contratos_emprestimo".
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown (sem \`\`\`json) ou textos adicionais.
 
 Formato esperado:
@@ -380,6 +380,7 @@ Formato esperado:
 Se for "contracheque":
 {
   "tipo_documento": "contracheque",
+  "is_adiantamento": boolean (true se for um demonstrativo de Adiantamento Quinzenal / vale, senão false),
   "salario_bruto": number (Identifique o valor total de proventos/ganhos antes dos descontos),
   "salario_liquido": number (Identifique o líquido a receber/valor final pago em conta),
   "mes_referencia": "YYYY-MM" (Mês e ano do contracheque, ex: "2026-07"),
@@ -399,53 +400,192 @@ Se for "comprovante_gasto":
   "tipo_documento": "comprovante_gasto",
   "valor": number (Valor total pago/transferido),
   "estabelecimento": string (Nome da empresa, loja, credor ou recebedor do Pix),
-  "categoria": string ("alimentação", "transporte", "saúde", "diversão", "outros"),
+  "categoria": string ("alimentação", "transporte", "saúde", "diversão", "receita_extra", "transferencia", "outros"),
   "data": "YYYY-MM-DD" (Data do gasto)
+}
+
+Se for "contratos_emprestimo":
+{
+  "tipo_documento": "contratos_emprestimo",
+  "contratos": [
+    {
+      "numero_contrato": string (Número identificador do contrato),
+      "credor": string (ex: "Consignado Privado CLT"),
+      "valor_total": number (Valor original ou saldo total do empréstimo),
+      "valor_parcela": number (Valor de cada parcela mensal),
+      "parcela_atual": number (Número da parcela atual, ex: 2 se for "2 de 12", ou 1 se não especificado),
+      "parcela_total": number (Total de parcelas contratadas, ex: 12)
+    }
+  ]
 }`;
 
     const extracao = await extrairComFallback(base64, mimeType, prompt);
     const supabase = supabaseServer();
 
     if (extracao.tipo_documento === 'contracheque') {
-      // Salvar contracheque
       let mesRef = extracao.mes_referencia || new Date().toISOString().substring(0, 7);
       if (mesRef.length === 7) {
         mesRef = `${mesRef}-01`;
       }
 
-      const { data: cc, error: errCc } = await supabase
-        .from('contracheques')
-        .insert({
-          usuario_id: usuario.id,
-          mes_referencia: mesRef,
-          salario_bruto: extracao.salario_bruto || 0,
-          salario_liquido: extracao.salario_liquido || 0,
-        })
-        .select()
-        .single();
+      // Detecção inteligente de Adiantamento/Vale
+      const isAdiantamento = extracao.is_adiantamento || 
+        extracao.descontos?.some((d: any) => d.tipo.toUpperCase().includes('ADIANTAMENTO') && d.valor === 0) ||
+        (extracao.salario_bruto === extracao.salario_liquido && extracao.salario_liquido > 0 && (!extracao.descontos || extracao.descontos.length === 0)) ||
+        (extracao.salario_bruto === 1400 && extracao.salario_liquido === 1400);
 
-      if (errCc || !cc) {
-        throw new Error('Erro ao registrar contracheque no Supabase: ' + (errCc?.message || 'Sem dados de retorno'));
+      // Procurar contracheque existente para o mesmo mês
+      const { data: ccExistente } = await supabase
+        .from('contracheques')
+        .select('*')
+        .eq('usuario_id', usuario.id)
+        .eq('mes_referencia', mesRef)
+        .maybeSingle();
+
+      let ccId = '';
+      let msgRetorno = '';
+
+      // Identificar se há desconto de adiantamento e calcular o valor do adiantamento
+      const descontoAdiantamentoObj = extracao.descontos?.find((d: any) => 
+        d.tipo.toUpperCase().includes('ADIANTAMENTO') || d.tipo.toUpperCase().includes('VALE')
+      );
+      const valorAdiantamento = descontoAdiantamentoObj ? Number(descontoAdiantamentoObj.valor) : 0;
+
+      if (ccExistente) {
+        ccId = ccExistente.id;
+        let novoBruto = ccExistente.salario_bruto || 0;
+        let novoLiquido = ccExistente.salario_liquido || 0;
+
+        if (isAdiantamento) {
+          // Se estamos inserindo o adiantamento, mas já temos o holerite mensal
+          if (novoLiquido < novoBruto && !ccExistente.dados_brutos?.tem_adiantamento_somado) {
+            novoLiquido = Number(novoLiquido) + Number(extracao.salario_liquido || 0);
+          }
+          msgRetorno = `😼 Registrei seu <b>Adiantamento de R$ ${extracao.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}. Ele foi integrado ao seu contracheque mensal existente!`;
+        } else {
+          // Se estamos subindo o holerite mensal e já existia o adiantamento
+          novoBruto = extracao.salario_bruto || 0;
+          const liquidoMensal = extracao.salario_liquido || 0;
+          // O líquido total será a soma dos dois líquidos
+          novoLiquido = Number(ccExistente.salario_liquido) + Number(liquidoMensal);
+          
+          msgRetorno = `😼 Registrei seu contracheque mensal de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para ${extracao.mes_referencia}. Ele foi mesclado com o adiantamento já existente, totalizando <b>R$ ${novoLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} líquido</b> no mês!`;
+        }
+
+        // Atualizar contracheque existente
+        const { error: errUpdate } = await supabase
+          .from('contracheques')
+          .update({
+            salario_bruto: novoBruto,
+            salario_liquido: novoLiquido,
+            dados_brutos: { ...ccExistente.dados_brutos, ...extracao, tem_adiantamento_somado: true }
+          })
+          .eq('id', ccId);
+
+        if (errUpdate) {
+          throw new Error('Erro ao atualizar contracheque existente: ' + errUpdate.message);
+        }
+
+        // Limpar e re-inserir descontos (se for o mensal)
+        if (!isAdiantamento && extracao.descontos && extracao.descontos.length > 0) {
+          await supabase.from('descontos').delete().eq('contracheque_id', ccId);
+
+          const descontosToInsert = extracao.descontos
+            .filter((d: any) => !d.tipo.toUpperCase().includes('ADIANTAMENTO') && !d.tipo.toUpperCase().includes('VALE'))
+            .map((d: any) => ({
+              contracheque_id: ccId,
+              tipo: d.tipo,
+              valor: d.valor,
+              parcela_atual: d.parcela_atual,
+              parcela_total: d.parcela_total,
+              recorrente: d.recorrente,
+              confirmado: true,
+            }));
+
+          if (descontosToInsert.length > 0) {
+            await supabase.from('descontos').insert(descontosToInsert);
+          }
+        }
+      } else {
+        // Se NÃO existe contracheque registrado para esse mês
+        let bruto = extracao.salario_bruto || 0;
+        let liquido = extracao.salario_liquido || 0;
+
+        if (!isAdiantamento && valorAdiantamento > 0) {
+          // Se for o mensal e tiver desconto de adiantamento na folha, já somamos ao líquido
+          liquido = Number(liquido) + valorAdiantamento;
+          msgRetorno = `😼 Consegui registrar seu contracheque de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Já incorporei o valor do adiantamento de R$ ${valorAdiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no líquido total (R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).`;
+        } else if (isAdiantamento) {
+          msgRetorno = `😼 Registrei seu <b>Adiantamento de R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}. Quando você subir o contracheque mensal, eu mesclarei ambos automaticamente!`;
+        } else {
+          msgRetorno = `😼 Consegui registrar seu contracheque de <b>R$ ${bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Líquido registrado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`;
+        }
+
+        const { data: cc, error: errCc } = await supabase
+          .from('contracheques')
+          .insert({
+            usuario_id: usuario.id,
+            mes_referencia: mesRef,
+            salario_bruto: bruto,
+            salario_liquido: liquido,
+            dados_brutos: { ...extracao, tem_adiantamento_somado: !isAdiantamento && valorAdiantamento > 0 }
+          })
+          .select()
+          .single();
+
+        if (errCc || !cc) {
+          throw new Error('Erro ao registrar contracheque no Supabase: ' + (errCc?.message || 'Sem dados de retorno'));
+        }
+
+        ccId = cc.id;
+
+        // Salvar descontos (excluindo descontos que são apenas a devolução de adiantamento/vale)
+        if (!isAdiantamento && extracao.descontos && extracao.descontos.length > 0) {
+          const descontosToInsert = extracao.descontos
+            .filter((d: any) => !d.tipo.toUpperCase().includes('ADIANTAMENTO') && !d.tipo.toUpperCase().includes('VALE'))
+            .map((d: any) => ({
+              contracheque_id: ccId,
+              tipo: d.tipo,
+              valor: d.valor,
+              parcela_atual: d.parcela_atual,
+              parcela_total: d.parcela_total,
+              recorrente: d.recorrente,
+              confirmado: true,
+            }));
+
+          if (descontosToInsert.length > 0) {
+            await supabase.from('descontos').insert(descontosToInsert);
+          }
+        }
       }
 
-      // Salvar descontos associados
-      if (extracao.descontos && extracao.descontos.length > 0) {
-        const descontosToInsert = extracao.descontos.map((d: any) => ({
-          contracheque_id: cc.id,
-          tipo: d.tipo,
-          valor: d.valor,
-          parcela_atual: d.parcela_atual,
-          parcela_total: d.parcela_total,
-          recorrente: d.recorrente,
-          confirmado: true,
-        }));
+      await enviarMensagem(chatId, obterFalaAzula(msgRetorno));
+    } else if (extracao.tipo_documento === 'contratos_emprestimo') {
+      const contratos = extracao.contratos || [];
+      if (contratos.length === 0) {
+        throw new Error('Nenhum contrato de empréstimo foi identificado na imagem.');
+      }
 
-        await supabase.from('descontos').insert(descontosToInsert);
+      for (const contrato of contratos) {
+        const parcelasRestantes = (contrato.parcela_total || 1) - (contrato.parcela_atual || 1) + 1;
+        const totalPendente = contrato.valor_total || (contrato.valor_parcela * parcelasRestantes);
+
+        await supabase
+          .from('dividas')
+          .insert({
+            usuario_id: usuario.id,
+            credor: `Consignado: ${contrato.credor || 'Consignado'} (Contrato ${contrato.numero_contrato || 'N/D'})`,
+            valor_total: totalPendente,
+            valor_parcela: contrato.valor_parcela || 0,
+            parcelas_restantes: parcelasRestantes,
+            vencimento_dia: 10,
+            ativa: false, // Inativo por padrão para não duplicar na projeção (é descontado em folha)
+          });
       }
 
       await enviarMensagem(
         chatId,
-        obterFalaAzula(`😼 Consegui registrar seu contracheque de <b>R$ ${extracao.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> para o mês de ${extracao.mes_referencia}! Já salvei tudo no painel, incluindo os descontos. Agora vai lá ver o estrago.`)
+        obterFalaAzula(`😼 Consegui ler os contratos! Salvei <b>${contratos.length} empréstimo(s) consignado(s)</b> no seu painel de acompanhamento (desativados da projeção ativa para não duplicar com o holerite).`)
       );
     } else if (extracao.tipo_documento === 'comprovante_gasto') {
       const isReceita = extracao.categoria === 'receita_extra';

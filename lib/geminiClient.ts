@@ -60,7 +60,7 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   }
 
   const isImage = mimeType.startsWith('image/');
-  const model = isImage && !isTextOnly ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+  const model = isImage && !isTextOnly ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
 
   const messages: any[] = [];
   if (isImage && !isTextOnly) {
@@ -89,9 +89,9 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
     temperature: 0.1
   };
 
-  // Os modelos de visão da Groq (llama-3.2-11b-vision-preview) NÃO suportam o parâmetro response_format: { type: "json_object" }.
+  // Os modelos de visão da Groq (llama-3.2-90b-vision-preview) NÃO suportam o parâmetro response_format: { type: "json_object" }.
   // Se for modelo de visão, enviamos sem essa opção e limpamos a resposta de markdown/backticks no javascript.
-  if (model !== 'llama-3.2-11b-vision-preview') {
+  if (model !== 'llama-3.2-90b-vision-preview') {
     payload.response_format = { type: 'json_object' };
   }
 
@@ -122,13 +122,11 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     try {
       console.log('Extraindo texto do PDF via pdf-parse...');
       const buffer = Buffer.from(base64, 'base64');
-      const pdfParseModule = require('pdf-parse');
-      const PDFParseClass = pdfParseModule.PDFParse || pdfParseModule;
-      const parser = new PDFParseClass({ data: new Uint8Array(buffer) });
-      const textResult = await parser.getText();
+      const pdf = require('pdf-parse');
+      const dataResult = await pdf(buffer);
       
-      if (textResult && textResult.text && textResult.text.trim().length > 0) {
-        base64OrText = textResult.text;
+      if (dataResult && dataResult.text && dataResult.text.trim().length > 0) {
+        base64OrText = dataResult.text;
         mimeTypeFinal = 'text/plain';
         isTextOnly = true;
         promptFinal = `${prompt}\n\n[Texto extraído do PDF]:\n${base64OrText}`;

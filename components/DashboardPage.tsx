@@ -58,8 +58,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
       const { data: dividasData } = await supabase
         .from('dividas')
-        .select('*')
-        .eq('ativa', true);
+        .select('*');
 
       const { data: gastosData } = await supabase
         .from('gastos_diarios')
@@ -115,8 +114,9 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     return contrachequeUserId === usuarioAtivo.id;
   });
 
-  // Filtrar dividas conforme a visão
+  // Filtrar dividas conforme a visão (apenas ativas para projeção de caixa)
   const dividasAtivas = dividas.filter((d) => {
+    if (!d.ativa) return false;
     if (visao === 'casal') return true;
     if (d.usuario_id === null) return true; // dívida conjunta
     return d.usuario_id === usuarioAtivo.id;
@@ -640,7 +640,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                   usuario_id: contracheques.find(c => c.id === d.contracheque_id)?.usuario_id || '',
                   mes_referencia: contracheques.find(c => c.id === d.contracheque_id)?.mes_referencia || ''
                 }))}
-                dividas={dividasAtivas.map(d => ({
+                dividas={dividas.filter(d => visao === 'casal' || d.usuario_id === null || d.usuario_id === usuarioAtivo.id).map(d => ({
                   id: d.id,
                   credor: d.credor,
                   valor_total: d.valor_total !== undefined ? d.valor_total : null,
