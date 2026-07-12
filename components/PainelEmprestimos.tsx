@@ -29,9 +29,15 @@ interface PainelEmprestimosProps {
 }
 
 export default function PainelEmprestimos({ descontos, dividas, visao: _visao }: PainelEmprestimosProps) {
-  // 1. Filtrar descontos que são empréstimos / parcelamentos (têm parcela_total)
+  // 1. Filtrar descontos que são empréstimos / parcelamentos (têm parcela_total ou contêm palavras-chave de empréstimos)
   const emprestimosContracheque = descontos.filter(
-    (d) => d.parcela_total && d.parcela_total > 0 && d.parcela_atual !== null
+    (d) => 
+      (d.parcela_total !== null && d.parcela_total > 0) || 
+      d.tipo.toUpperCase().includes('EMPRÉSTIMO') || 
+      d.tipo.toUpperCase().includes('EMPRESTIMO') ||
+      d.tipo.toUpperCase().includes('CONSIGNADO') ||
+      d.tipo.toUpperCase().includes('FINANCIAMENTO') ||
+      d.tipo.toUpperCase().includes('CEF')
   );
 
   // 2. Filtrar dívidas que são parcelamentos (têm parcelas_restantes)
@@ -41,9 +47,10 @@ export default function PainelEmprestimos({ descontos, dividas, visao: _visao }:
 
   // Calcular totais
   const totalContrachequeRestante = emprestimosContracheque.reduce((acc, d) => {
+    const temParcelas = d.parcela_total !== null && d.parcela_total > 0;
     const atual = d.parcela_atual || 1;
     const total = d.parcela_total || 1;
-    const restantes = total - atual + 1;
+    const restantes = temParcelas ? (total - atual + 1) : 1;
     return acc + d.valor * restantes;
   }, 0);
 
@@ -117,11 +124,12 @@ export default function PainelEmprestimos({ descontos, dividas, visao: _visao }:
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
                 {emprestimosContracheque.map((emp) => {
+                  const temParcelas = emp.parcela_total !== null && emp.parcela_total > 0;
                   const atual = emp.parcela_atual || 1;
                   const total = emp.parcela_total || 1;
-                  const restantes = total - atual + 1;
+                  const restantes = temParcelas ? (total - atual + 1) : 1;
                   const saldoDevedor = emp.valor * restantes;
-                  const percent = Math.min(100, Math.round((atual / total) * 100));
+                  const percent = temParcelas ? Math.min(100, Math.round((atual / total) * 100)) : 0;
 
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
@@ -141,22 +149,30 @@ export default function PainelEmprestimos({ descontos, dividas, visao: _visao }:
                         R$ {emp.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-4">
-                        <div className="flex flex-col items-center justify-center gap-1 min-w-[120px]">
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all ${
-                                emp.usuario_nome === 'Germano' ? 'bg-blue-500' : 'bg-pink-500'
-                              }`} 
-                              style={{ width: `${percent}%` }}
-                            />
+                        {temParcelas ? (
+                          <div className="flex flex-col items-center justify-center gap-1 min-w-[120px]">
+                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  emp.usuario_nome === 'Germano' ? 'bg-blue-500' : 'bg-pink-500'
+                                }`} 
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                            <span className="text-slate-400 text-xxs font-semibold">
+                              {atual} de {total} parcelas ({percent}%)
+                            </span>
                           </div>
-                          <span className="text-slate-400 text-xxs font-semibold">
-                            {atual} de {total} parcelas ({percent}%)
-                          </span>
-                        </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic">Desconto mensal fixo / Sob consulta</span>
+                        )}
                       </td>
                       <td className="py-4 text-right font-bold text-slate-800">
-                        R$ {saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {temParcelas ? (
+                          `R$ ${saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                        ) : (
+                          <span className="text-slate-400 font-normal italic">Sob consulta</span>
+                        )}
                       </td>
                     </tr>
                   );

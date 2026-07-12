@@ -465,7 +465,6 @@ Se for "contratos_emprestimo":
 
       // Detecção inteligente de Adiantamento/Vale
       const isAdiantamento = extracao.is_adiantamento || 
-        extracao.descontos?.some((d: any) => d.tipo.toUpperCase().includes('ADIANTAMENTO') && d.valor === 0) ||
         (extracao.salario_bruto === extracao.salario_liquido && extracao.salario_liquido > 0 && (!extracao.descontos || extracao.descontos.length === 0)) ||
         (extracao.salario_bruto === 1400 && extracao.salario_liquido === 1400) ||
         (extracao.salario_bruto === 1400.26 && extracao.salario_liquido === 993);
@@ -493,9 +492,18 @@ Se for "contratos_emprestimo":
 
       if (ccExistente) {
         ccId = ccExistente.id;
-        let novoBruto = ccExistente.salario_bruto || 0;
-        let novoLiquido = ccExistente.salario_liquido || 0;
-        const dadosBrutosMerged = { ...ccExistente.dados_brutos };
+        
+        // Recarregar os dados mais frescos do contracheque para mitigar race conditions
+        const { data: ccFresco } = await supabase
+          .from('contracheques')
+          .select('*')
+          .eq('id', ccId)
+          .single();
+
+        const ccAtual = ccFresco || ccExistente;
+        let novoBruto = ccAtual.salario_bruto || 0;
+        let novoLiquido = ccAtual.salario_liquido || 0;
+        const dadosBrutosMerged = { ...ccAtual.dados_brutos };
 
         if (isAdiantamento) {
           dadosBrutosMerged.salario_liquido_adiantamento = extracao.salario_liquido || 0;
