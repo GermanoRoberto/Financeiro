@@ -15,11 +15,23 @@ Instruções de Extração:
    - "parcela_total": O número total de parcelas (ex: 12 ou 10 no exemplo anterior). Caso contrário, retorne null.
    - "recorrente": Um booleano indicando se é um desconto recorrente (mensal permanente como INSS, FPM, Plano de Saúde, coparticipação padrão) ou não (como empréstimos parcelados, adiantamentos pontuais).
 
-REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA:
-1. O salario_bruto (Total de Proventos) deve ser exatamente igual à soma dos proventos individuais do documento.
-2. A soma dos descontos individuais na lista "descontos" deve ser exatamente igual ao total de descontos do documento (ex: 3814.14).
-3. O salario_liquido deve ser exatamente igual a (salario_bruto - soma de todos os descontos).
-Use essas regras matemáticas para validar os números extraídos. Se faltar algum valor na lista de descontos para fechar a conta do líquido, encontre qual linha de desconto foi omitida (ex: "FPM (FOLHA)") e adicione-a à lista.
+REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
+1. ATENÇÃO AO LAYOUT DE COLUNAS DE CADA FUNCIONÁRIO:
+   - No contracheque de GERMANO ROBERTO DO CARMO SOBRINHO (Rodoviário Camilo dos Santos), o texto extraído tem o valor financeiro ANTES da descrição! O formato é [Código] [Valor Financeiro] [Descrição] [Índice/Referência]. 
+     Exemplos reais extraídos do texto:
+     * "901 0308,58 INSS 8,817" -> O valor do desconto do INSS é R$ 308,58 (8,817 é o índice/alíquota, ignore-o!).
+     * "126 15,60 UNIMED ODONTO DEPENDENTE 0,000" -> O valor do desconto é R$ 15,60.
+     * "10014 143,49 COPARTICIPAÇÃO PLASC PARC EV 10,000" -> O valor do desconto é R$ 143,49 (10,000 é o índice/referência, ignore-o!).
+     * "10096 1.018,15 DESCONTO CRÉDITO TRABALHADOR 0,000" -> O valor do desconto é R$ 1.018,15.
+     * "651 1.400,00 DESC ADIANTAMENTO QUINZENAL 0,000" -> O valor do desconto é R$ 1.400,00.
+     Certifique-se de usar o número anterior à descrição como o valor e ignorar o número final (que é a referência)!
+   - No contracheque da Prefeitura de Juiz de Fora (PRISCILA APARECIDA DA SILVA TOLEDO), o formato é [Código] [Descrição] [Referência] [Valor Financeiro]. O valor vem no final!
+     Exemplo real extraído do texto:
+     * "56 FPM (FOLHA) 14,0000 925,40" -> O valor do desconto é R$ 925,40.
+2. O salario_bruto (Total de Proventos) deve ser exatamente igual à soma dos proventos individuais do documento.
+3. A soma dos descontos individuais na lista "descontos" deve ser exatamente igual ao total de descontos do documento (ex: 3814.14 ou 2987.89).
+4. O salario_liquido deve ser exatamente igual a (salario_bruto - soma de todos os descontos).
+Use essas regras matemáticas para validar os números extraídos. Se faltar algum valor na lista de descontos para fechar a conta do líquido, encontre qual linha de desconto foi omitida e adicione-a à lista.
 
 Formato do JSON de retorno esperado:
 {
