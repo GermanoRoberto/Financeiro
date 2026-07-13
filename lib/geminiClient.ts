@@ -98,6 +98,7 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   let lastError: any = null;
 
   for (const model of candidates) {
+    let payload: any = null;
     try {
       console.log(`Tentando extrair dados com o modelo Groq: ${model}...`);
       
@@ -122,7 +123,7 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
         });
       }
 
-      const payload: any = {
+      payload = {
         model: model,
         messages: messages,
         temperature: 0.1
@@ -141,7 +142,7 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
             'Authorization': `Bearer ${GROQ_API_KEY}`,
             'Content-Type': 'application/json'
           },
-          timeout: 10000
+          timeout: 12000
         }
       );
 
@@ -149,8 +150,48 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
       const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       return JSON.parse(jsonStr);
     } catch (err: any) {
+      const status = err.response?.status;
       const errMsg = err.response?.data?.error?.message || err.message;
-      console.warn(`Falha na chamada com o modelo Groq ${model}: ${errMsg}. Tentando próximo candidato...`);
+      
+      // AUTO-RETRY 429 (Rate Limit): se a Groq pedir para esperar, nós esperamos e tentamos de novo
+      if (status === 429) {
+        let retryAfterMs = 2000;
+        const matchSeconds = errMsg.match(/try again in ([\d\.]+)s/i);
+        if (matchSeconds) {
+          retryAfterMs = Math.ceil(parseFloat(matchSeconds[1]) * 1000) + 500;
+        } else {
+          const matchMs = errMsg.match(/retry in ([\d\.]+)ms/i);
+          if (matchMs) {
+            retryAfterMs = Math.ceil(parseFloat(matchMs[1])) + 100;
+          }
+        }
+
+        // Se o tempo para liberar a cota for aceitável (menor que 8 segundos), fazemos a pausa e retentativa
+        if (retryAfterMs < 8000) {
+          console.log(`[Groq Rate Limit] Limite atingido. Aguardando ${retryAfterMs}ms para tentar novamente no modelo ${model}...`);
+          await new Promise(resolve => setTimeout(resolve, retryAfterMs));
+          try {
+            const responseRetry = await axios.post(
+              'https://api.groq.com/openai/v1/chat/completions',
+              payload,
+              {
+                headers: {
+                  'Authorization': `Bearer ${GROQ_API_KEY}`,
+                  'Content-Type': 'application/json'
+                },
+                timeout: 12000
+              }
+            );
+            const textContentRetry = responseRetry.data.choices?.[0]?.message?.content || '';
+            const jsonStrRetry = textContentRetry.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            return JSON.parse(jsonStrRetry);
+          } catch (retryErr: any) {
+            err = retryErr;
+          }
+        }
+      }
+
+      console.warn(`Falha na chamada com o modelo Groq ${model}: ${err.response?.data?.error?.message || err.message}. Tentando próximo candidato...`);
       lastError = err;
     }
   }
@@ -188,24 +229,59 @@ async function extrairComGemini(base64OrText: string, mimeType: string, prompt: 
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-  const response = await axios.post(
-    url,
-    {
-      contents,
-      generationConfig: {
-        responseMimeType: "application/json"
+  
+  try {
+    const response = await axios.post(
+      url,
+      {
+        contents,
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
       }
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json'
+    );
+
+    const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return JSON.parse(jsonStr);
+  } catch (err: any) {
+    const status = err.response?.status;
+    
+    // AUTO-RETRY 429 (Gemini Rate Limit): se o Gemini estourar o limite de cota grátis por minutos, espera 3 segundos e tenta de novo
+    if (status === 429) {
+      console.log(`[Gemini Rate Limit] Limite atingido. Aguardando 3000ms para tentar novamente no Gemini...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        const responseRetry = await axios.post(
+          url,
+          {
+            contents,
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            timeout: 15000
+          }
+        );
+        const textContentRetry = responseRetry.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonStrRetry = textContentRetry.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        return JSON.parse(jsonStrRetry);
+      } catch (retryErr: any) {
+        err = retryErr;
       }
     }
-  );
-
-  const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(jsonStr);
+    throw err;
+  }
 }
 
 export async function extrairComFallback(base64: string, mimeType: string, prompt: string): Promise<any> {
