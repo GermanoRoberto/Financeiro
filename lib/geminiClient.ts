@@ -48,12 +48,12 @@ Formato do JSON de retorno esperado:
   ]
 }`;
 
-const PROMPT_GASTO = `Analise o comprovante de pagamento/recibo de compra/comprovante de Pix fornecido.
+const PROMPT_GASTO = `Analise o comprovante de pagamento, recibo de compra, comprovante de Pix ou fatura de consumo/cobrança (como contas de internet, telefone, água, luz ou boletos) fornecido.
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown ou textos adicionais.
 
 Instruções de Extração:
-1. "valor": O valor total pago, transferido ou recebido. Deve ser um número decimal.
-2. "estabelecimento": O nome da empresa, mercado, loja ou pessoa recebedora (credor/beneficiário). Em caso de PIX recebido, coloque o nome do pagador. Em caso de transferência entre o casal, coloque o nome de quem recebeu a transferência (ex: "Para Priscila" ou "Para Germano").
+1. "valor": O valor total pago, transferido, recebido ou o valor total da fatura/boleto a pagar (ex: 85.00). Deve ser um número decimal.
+2. "estabelecimento": O nome da empresa emissora da fatura, mercado, loja ou pessoa recebedora (credor/beneficiário, ex: "Vivo", "Claro", "Coelba"). Em caso de PIX recebido, coloque o nome do pagador. Em caso de transferência entre o casal, coloque o nome de quem recebeu a transferência (ex: "Para Priscila" ou "Para Germano").
 3. "categoria": Classifique a transação em uma das seguintes opções exatas: "alimentação", "transporte", "saúde", "diversão", "receita_extra", "transferencia", "outros".
    - "alimentação": Supermercados, restaurantes, padarias, iFood, lanchonetes.
    - "transporte": Postos de combustível, Uber, 99, passagens, pedágio, estacionamento.
@@ -61,8 +61,8 @@ Instruções de Extração:
    - "diversão": Cinema, shows, streaming, jogos, viagens de lazer.
    - "receita_extra": Entradas de dinheiro, PIX recebido de terceiros, bônus, salários adicionais, dinheiro extra ganho (que não seja transferência do próprio cônjuge).
    - "transferencia": Dinheiro transferido entre o casal (ex: PIX do marido para a esposa, ou da esposa para o marido).
-   - "outros": Qualquer gasto/transação que não se encaixe nas categorias acima.
-4. "data": A data em que o gasto/transação foi realizado, no formato "YYYY-MM-DD" (ex: "2026-07-11"). Se não encontrar a data, use a data atual.
+   - "outros": Contas de consumo, telefone, internet, tarifas, impostos ou qualquer gasto/transação que não se encaixe nas categorias acima.
+4. "data": A data em que o gasto/transação foi realizado ou a data de vencimento da fatura, no formato "YYYY-MM-DD" (ex: "2026-07-21"). Se não encontrar a data, use a data atual.
 
 Formato do JSON de retorno esperado:
 {

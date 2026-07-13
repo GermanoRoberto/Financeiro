@@ -469,10 +469,10 @@ Use essas regras matemáticas para validar os números extraídos. Se faltar alg
 Se for "comprovante_gasto":
 {
   "tipo_documento": "comprovante_gasto",
-  "valor": number (Valor total pago/transferido),
-  "estabelecimento": string (Nome da empresa, loja, credor ou recebedor do Pix),
+  "valor": number (Valor total pago/transferido ou valor total da fatura/boleto a pagar),
+  "estabelecimento": string (Nome da empresa emissora da fatura, mercado, loja, credor ou recebedor, ex: "Vivo", "Coelba", "Uber"),
   "categoria": string ("alimentação", "transporte", "saúde", "diversão", "receita_extra", "transferencia", "outros"),
-  "data": "YYYY-MM-DD" (Data do gasto)
+  "data": "YYYY-MM-DD" (Data do gasto ou data de vencimento da fatura/cobrança)
 }
 
 Se for "contratos_emprestimo":
