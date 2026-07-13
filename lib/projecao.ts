@@ -30,7 +30,15 @@ export function projetarDescontos(
     // Filtrar descontos válidos para este mês
     const descontosDoMes = descontos.filter((d) => {
       if (!d.confirmado) return false;
-      if (!d.recorrente) return i === 0; // não recorrente só no primeiro mês
+      
+      // Empréstimos e descontos de crédito consignado são recorrentes por definição
+      const tipoLower = (d.tipo || '').toLowerCase();
+      const ehEmprestimo = tipoLower.includes('empréstimo') || 
+                           tipoLower.includes('consignado') || 
+                           tipoLower.includes('cef') || 
+                           tipoLower.includes('crédito trabalhador');
+
+      if (!d.recorrente && !ehEmprestimo) return i === 0; // não recorrente só no primeiro mês
       if (d.parcela_total) {
         const restantes = (d.parcela_total || 0) - (d.parcela_atual || 0);
         return i < restantes;
