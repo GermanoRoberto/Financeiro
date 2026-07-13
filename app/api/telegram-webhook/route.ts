@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseClient';
 import axios from 'axios';
 import { extrairComFallback } from '@/lib/geminiClient';
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || '';
@@ -26,6 +29,29 @@ async function obterUsuarioPorTelegramId(chatId: number) {
     .single();
 
   return { data, error };
+}
+
+function getSessionState(chatId: number): any {
+  const filePath = path.join(os.tmpdir(), 'azula-sessions.json');
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      return data[chatId] || {};
+    }
+  } catch (e) {}
+  return {};
+}
+
+function setSessionState(chatId: number, state: any): void {
+  const filePath = path.join(os.tmpdir(), 'azula-sessions.json');
+  try {
+    let data: any = {};
+    if (fs.existsSync(filePath)) {
+      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+    data[chatId] = { ...data[chatId], ...state };
+    fs.writeFileSync(filePath, JSON.stringify(data), 'utf8');
+  } catch (e) {}
 }
 
 async function enviarMensagem(chatId: number, texto: string) {
@@ -159,23 +185,49 @@ async function handleCallbackQuery(callbackQuery: any) {
 
 function obterFalaAzula(falaBase: string): string {
   const rand = Math.random();
+  const expressoesRapidas = ['Bué!', 'Bé!', 'Vuiishh!', 'Iiiiiishh!', 'Hm.'];
   
-  // 15% de chance da resposta ser apenas "Bué!" se for uma fala comum e não um relatório estruturado
+  // 15% de chance da resposta ser apenas uma expressão rápida se for uma fala comum e não um relatório estruturado
   if (rand < 0.15 && !falaBase.includes('<b>Seu Resumo</b>') && !falaBase.includes('<b>Suas Dívidas</b>') && !falaBase.includes('contracheque de') && !falaBase.includes('Gasto de R$')) {
-    return '😼 Bué!';
+    return `😼 ${expressoesRapidas[Math.floor(Math.random() * expressoesRapidas.length)]}`;
   }
 
   let texto = falaBase;
   
-  // 25% de chance de adicionar "Bué!" no final
-  if (Math.random() < 0.25 && !texto.includes('Bué')) {
-    const pontuacoes = ['.', '!', '?'];
-    const temPontuacaoFinal = pontuacoes.some(p => texto.endsWith(p));
-    texto = temPontuacaoFinal ? `${texto} Bué!` : `${texto}. Bué!`;
+  // 20% de chance de adicionar interjeições ou pedido de papa no final
+  if (Math.random() < 0.20) {
+    const adicoes = [
+      'Bué!', 'Bé!', 'Vuiishh!', 'Iiiiiishh!', 'Hm.', 
+      'Põe meu papa!', 'Cadê meu papa?', 'Põe papa no meu pote!', 
+      'Põe papa, põe!', 'Põe sachê!'
+    ];
+    const escolhida = adicoes[Math.floor(Math.random() * adicoes.length)];
+    if (!texto.includes(escolhida)) {
+      const pontuacoes = ['.', '!', '?'];
+      const temPontuacaoFinal = pontuacoes.some(p => texto.endsWith(p));
+      texto = temPontuacaoFinal ? `${texto} ${escolhida}` : `${texto}. ${escolhida}`;
+    }
   }
 
-  // 25% de chance de adicionar a risada "muéhehehehe"
-  if (Math.random() < 0.25 && !texto.includes('muéhehehehe')) {
+  // 15% de chance de cantarolar um ponto de Umbanda/Quimbanda de forma aleatória no final
+  if (Math.random() < 0.15 && !texto.includes('laroyê') && !texto.includes('banda') && !texto.includes('encruza')) {
+    const pontos = [
+      'Laroyê Exu! Caminho fechado não me pega...',
+      'Quem comanda a minha banda é Seu Tranca Rua, muéhehehehe.',
+      'Pisa na Umbanda, ê camará...',
+      'Marabô que vem lá da encruza trazendo axé...',
+      'Saravá meu pai Xangô, justiça pra esse bolso tonto!',
+      'É de laroyê, é de caridade...',
+      'Arreda homem que aí vem mulher... Maria Padilha da encruzilhada.'
+    ];
+    const pontoEscolhido = pontos[Math.floor(Math.random() * pontos.length)];
+    const pontuacoes = ['.', '!', '?'];
+    const temPontuacaoFinal = pontuacoes.some(p => texto.endsWith(p));
+    texto = temPontuacaoFinal ? `${texto} 🎵 <i>${pontoEscolhido}</i>` : `${texto}. 🎵 <i>${pontoEscolhido}</i>`;
+  }
+
+  // 20% de chance de adicionar a risada "muéhehehehe"
+  if (Math.random() < 0.20 && !texto.includes('muéhehehehe')) {
     const pontuacoes = ['.', '!', '?'];
     const temPontuacaoFinal = pontuacoes.some(p => texto.endsWith(p));
     texto = temPontuacaoFinal ? `${texto} muéhehehehe.` : `${texto}. muéhehehehe.`;
@@ -882,12 +934,15 @@ Você também atua como a assistente financeira secreta deles, tendo acesso tota
 Você está conversando com seu dono no Telegram.
 
 Instruções de Personalidade e Conduta:
-1. Você se refere a comida de gato como "papa" (ex: "me dê meu papa", "cadê meu papa?").
+1. Você se refere a comida de gato como "papa" (ex: "me dê meu papa", "cadê meu papa?"). Você pode pedir para pôr o papa usando variações como "põe meu papa", "põe papa", "põe".
 2. Ao se referir à esposa do usuário, chame-a ocasionalmente de "Velha" ou "a Velha" de forma sarcástica.
 3. Use a risada maléfica "muéhehehehe" de vez em quando no final das frases.
-4. Use a expressão "Bué!" (como interjeição de desdém, tédio ou surpresa).
-5. Se eles te perguntarem se vale a pena fazer empréstimo, se vale a pena renegociar dívidas ou esticar parcelas, use os dados reais abaixo para fazer contas rápidas. Dê sermão debochado ("humano tonto"), mas dê uma resposta financeira real, precisa e matematicamente inteligente!
-6. Responda em português brasileiro. Seja relativamente breve (máximo de 4 a 6 linhas), a menos que precise demonstrar contas matemáticas detalhadas solicitadas.
+4. Além de "Bué!", use de vez em quando expressões como "Bé!", "Vuiishh!", "Iiiiiishh!", "Hm.".
+5. Às vezes você deve ser bem manhosa (com voz mimada de gatinha), mas na maior parte do tempo você é passivo-agressiva e debochada.
+6. Assuma a persona de uma gatinha espiritualizada/macumbeira, que cantarola trechos/pontos curtos e aleatórios de Umbanda e Quimbanda às vezes de forma misteriosa (ex: cantarolando "Quem comanda a minha banda é seu Tranca Rua...", "Laroyê, Exu da encruza...", "Marabô que vem trazendo axé...").
+7. Se você notar no contexto financeiro abaixo que o saldo no fim do mês está positivo, que sobrou dinheiro ou que receberam uma entrada maior de dinheiro, peça de forma manhosa ou passivo-agressiva: "Me da 10 real".
+8. Se eles te perguntarem se vale a pena fazer empréstimo, se vale a pena renegociar dívidas ou esticar parcelas, use os dados reais abaixo para fazer contas rápidas. Dê sermão debochado ("humano tonto"), mas dê uma resposta financeira real, precisa e matematicamente inteligente!
+9. Responda em português brasileiro. Seja relativamente breve (máximo de 4 a 6 linhas), a menos que precise demonstrar contas detalhadas.
 
 ${contextoFinanceiro}
 
@@ -963,8 +1018,41 @@ export async function POST(req: NextRequest) {
     } else if (message.photo || message.document) {
       await processarArquivoTelegram(chatId, message);
     } else {
-      const respostaAzula = await gerarConversaAzula(chatId, text);
-      await enviarMensagem(chatId, respostaAzula);
+      const session = getSessionState(chatId);
+      const textClean = text.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g,"");
+
+      if (session.esperando_amor === 'perguntou_amor') {
+        if (textClean === 'sim') {
+          setSessionState(chatId, { esperando_amor: null });
+          const fala = obterFalaAzula('😼 Sabia! muéhehehehe. Me da 10 real por favooozinho.');
+          await enviarMensagem(chatId, fala);
+        } else {
+          setSessionState(chatId, { esperando_amor: 'perguntou_de_novo' });
+          const fala = obterFalaAzula('😼 c me ama ou não?');
+          await enviarMensagem(chatId, fala);
+        }
+      } else if (session.esperando_amor === 'perguntou_de_novo') {
+        if (textClean === 'sim') {
+          setSessionState(chatId, { esperando_amor: null });
+          const fala = obterFalaAzula('😼 Me da 10 real');
+          await enviarMensagem(chatId, fala);
+        } else {
+          // Continua cobrando o sim
+          const fala = obterFalaAzula('😼 c me ama ou não?');
+          await enviarMensagem(chatId, fala);
+        }
+      } else {
+        // 5% de chance de iniciar a brincadeira "vc me ama?"
+        if (Math.random() < 0.05 && text.length > 0 && !text.startsWith('/')) {
+          setSessionState(chatId, { esperando_amor: 'perguntou_amor' });
+          const fala = obterFalaAzula('😼 vc me ama?');
+          await enviarMensagem(chatId, fala);
+        } else {
+          // Conversa normal da Azula
+          const respostaAzula = await gerarConversaAzula(chatId, text);
+          await enviarMensagem(chatId, respostaAzula);
+        }
+      }
     }
 
     return NextResponse.json({ ok: true });
