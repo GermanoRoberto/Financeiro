@@ -452,7 +452,8 @@ Se for "extrato_bancario":
       "data": "YYYY-MM-DD" (Data da transação, ex: "2026-07-01")
     }
   ]
-}`;
+}
+ATENÇÃO: Ignore as linhas de resumo diário que começam com "Total de entradas" ou "Total de saídas". Extraia APENAS as transações individuais (como compras no débito, compras via NuPay, transferências enviadas/recebidas, Pix enviado/recebido, tarifas e pagamentos)!`;
 
     const extracao = await extrairComFallback(base64, mimeType, prompt);
     const supabase = supabaseServer();
