@@ -122,6 +122,13 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     return d.usuario_id === usuarioAtivo.id;
   });
 
+  // Filtrar dividas para a listagem da aba de Dívidas (inclui inativas/consignados)
+  const dividasAba = dividas.filter((d) => {
+    if (visao === 'casal') return true;
+    if (d.usuario_id === null) return true;
+    return d.usuario_id === usuarioAtivo.id;
+  });
+
   // Filtrar gastos conforme a visão
   const gastosFiltrados = _gastos.filter((g) => {
     if (visao === 'casal') return true;
@@ -559,7 +566,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                       <span>💳</span> Dívidas Cadastradas ({visao === 'casal' ? 'Casal' : visao === 'voce' ? 'Você' : (usuarioEsposa?.nome || 'Parceiro(a)')})
                     </h3>
 
-                    {dividasAtivas.length === 0 ? (
+                    {dividasAba.length === 0 ? (
                       <div className="text-center py-8 text-slate-400">
                         Nenhuma dívida cadastrada para esta visão.
                       </div>
@@ -573,11 +580,12 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                               <th className="pb-3 pr-4">Valor Parcela</th>
                               <th className="pb-3 pr-4 text-center">Restantes</th>
                               <th className="pb-3 pr-4">Dono</th>
+                              <th className="pb-3 pr-4">Tipo</th>
                               <th className="pb-3 text-center">Ações</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-white/5 text-sm">
-                            {dividasAtivas.map((d) => {
+                            {dividasAba.map((d) => {
                               const dono = d.usuario_id === null 
                                 ? 'Conjunta' 
                                 : (d.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa'));
@@ -602,6 +610,15 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                           : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
                                     }`}>
                                       {dono}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 pr-4">
+                                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                                      d.ativa
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    }`}>
+                                      {d.ativa ? 'Manual' : 'Consignado (Em Folha)'}
                                     </span>
                                   </td>
                                   <td className="py-3.5 text-center">
