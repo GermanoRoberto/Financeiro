@@ -372,7 +372,7 @@ async function processarArquivoTelegram(chatId: number, message: any) {
     const base64 = buffer.toString('base64');
 
     // 3. Prompt para o Gemini / Groq com instruções detalhadas
-    const prompt = `Analise este documento/imagem e classifique-o em "contracheque", "comprovante_gasto" ou "contratos_emprestimo".
+    const prompt = `Analise este documento/imagem e classifique-o em "contracheque", "comprovante_gasto", "contratos_emprestimo" ou "extrato_bancario".
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown (sem \`\`\`json) ou textos adicionais.
 
 Formato esperado:
@@ -434,6 +434,22 @@ Se for "contratos_emprestimo":
       "valor_parcela": number (Valor de cada parcela mensal),
       "parcela_atual": number (Número da parcela atual, ex: 2 se for "2 de 12", ou 1 se não especificado),
       "parcela_total": number (Total de parcelas contratadas, ex: 12)
+    }
+  ]
+}
+
+Se for "extrato_bancario":
+{
+  "tipo_documento": "extrato_bancario",
+  "transacoes": [
+    {
+      "valor": number (Valor absoluto do lançamento como número decimal positivo. Não coloque sinal de menos. Ex: 27.00 ou 920.00),
+      "estabelecimento": string (Nome da pessoa, empresa ou descrição da transação, ex: "GabrielDeAlmeida" ou "Priscila Aparecida..."),
+      "categoria": string ("alimentação"|"transporte"|"saúde"|"diversão"|"receita_extra"|"transferencia"|"outros". 
+                          Dica: se for transferência entre o casal, use "transferencia". 
+                          Se for recebimento de terceiros que não seja do cônjuge, use "receita_extra". 
+                          Se for débito/compra, use a categoria correspondente.),
+      "data": "YYYY-MM-DD" (Data da transação, ex: "2026-07-01")
     }
   ]
 }`;
@@ -692,6 +708,45 @@ Se for "contratos_emprestimo":
       await enviarMensagem(
         chatId,
         obterFalaAzula(`😼 Consegui ler os contratos! Salvei <b>${contratos.length} empréstimo(s) consignado(s)</b> no seu painel de acompanhamento (desativados da projeção ativa para não duplicar com o holerite).`)
+      );
+    } else if (extracao.tipo_documento === 'extrato_bancario') {
+      const transacoes = extracao.transacoes || [];
+      if (transacoes.length === 0) {
+        throw new Error('Nenhuma transação foi identificada no extrato.');
+      }
+
+      let totalRegistradas = 0;
+      
+      for (const t of transacoes) {
+        // Evitar duplicados simples (mesmo valor, estabelecimento, data e usuario)
+        const { data: existente } = await supabase
+          .from('gastos_diarios')
+          .select('id')
+          .eq('usuario_id', usuario.id)
+          .eq('valor', t.valor || 0)
+          .eq('estabelecimento', t.estabelecimento || 'Não identificado')
+          .eq('data', t.data)
+          .maybeSingle();
+
+        if (!existente) {
+          await supabase
+            .from('gastos_diarios')
+            .insert({
+              usuario_id: usuario.id,
+              valor: t.valor || 0,
+              estabelecimento: t.estabelecimento || 'Não identificado',
+              categoria: t.categoria || 'outros',
+              data: t.data || new Date().toISOString().substring(0, 10),
+              origem: 'telegram',
+              confirmado: true, // Já vem confirmado porque é do extrato oficial do banco!
+            });
+          totalRegistradas++;
+        }
+      }
+
+      await enviarMensagem(
+        chatId,
+        obterFalaAzula(`😼 Li o seu extrato bancário! Consegui registrar <b>${totalRegistradas} novas transações</b> (de um total de ${transacoes.length} encontradas) diretamente no seu painel. Menos trabalho para vocês, muéhehehehe!`)
       );
     } else if (extracao.tipo_documento === 'comprovante_gasto') {
       const isReceita = extracao.categoria === 'receita_extra';
