@@ -79,7 +79,7 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   }
 
   const isImage = mimeType.startsWith('image/');
-  const model = isImage && !isTextOnly ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+  const model = isImage && !isTextOnly ? 'qwen/qwen3.6-27b' : 'llama-3.3-70b-versatile';
 
   const messages: any[] = [];
   if (isImage && !isTextOnly) {
@@ -108,9 +108,8 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
     temperature: 0.1
   };
 
-  // Os modelos de visão da Groq (llama-3.2-11b-vision-preview) NÃO suportam o parâmetro response_format: { type: "json_object" }.
-  // Se for modelo de visão, enviamos sem essa opção e limpamos a resposta de markdown/backticks no javascript.
-  if (model !== 'llama-3.2-11b-vision-preview') {
+  // Se for o modelo Qwen de visão, também evitamos enviar response_format por segurança caso venha a falhar, tratando a resposta de markdown no Javascript
+  if (model !== 'qwen/qwen3.6-27b') {
     payload.response_format = { type: 'json_object' };
   }
 
