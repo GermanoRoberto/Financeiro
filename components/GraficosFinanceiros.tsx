@@ -88,7 +88,11 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
             <XAxis dataKey="mes" stroke="#94a3b8" fontSize={11} fontWeight={500} />
             <YAxis stroke="#94a3b8" fontSize={11} />
             <Tooltip content={<CustomTooltip />} />
-            <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+            <Legend 
+              iconType="circle" 
+              wrapperStyle={{ fontSize: 12, paddingTop: 10 }} 
+              formatter={(value) => <span className="text-slate-700 font-bold">{value}</span>}
+            />
             <Bar dataKey="receita" fill="url(#barBlue)" name="Receita (Bruta)" radius={[4, 4, 0, 0]} barSize={14} />
             <Bar dataKey="despesas" fill="url(#barRed)" name="Despesas Totais" radius={[4, 4, 0, 0]} barSize={14} />
             <Bar dataKey="liquido" fill="url(#barGreen)" name="Salário Líquido (Livre)" radius={[4, 4, 0, 0]} barSize={14} />
@@ -131,7 +135,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                   const total = tipoDespesasData.reduce((acc, d) => acc + d.value, 0);
                   const percent = total > 0 ? ((item?.value || 0) / total * 100).toFixed(0) : 0;
                   const nomeCurto = value.length > 28 ? value.substring(0, 26) + '...' : value;
-                  return <span className="text-slate-600 font-semibold">{nomeCurto} ({percent}%)</span>;
+                  return <span className="text-slate-700 font-bold">{nomeCurto} ({percent}%)</span>;
                 }}
               />
             </PieChart>
