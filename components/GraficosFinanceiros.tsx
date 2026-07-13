@@ -46,6 +46,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
     mes: mes.mesFormatado.split(' ')[0].substring(0, 3).toUpperCase(),
     receita: mes.salarioBruto,
     despesas: mes.totalGeral,
+    liquido: mes.salarioBruto - mes.totalGeral,
   }));
 
   const tipoDespesasData = projecao[0]?.descontos?.reduce((acc: any[], d) => {
@@ -65,7 +66,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
       <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
         <div className="mb-4">
           <h3 className="text-lg font-bold text-slate-800">📊 Projeção Financeira (6 Meses)</h3>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">Visão comparativa entre receitas brutas e despesas totais</p>
+          <p className="text-xs text-slate-400 font-medium mt-0.5">Visão comparativa entre receitas, despesas e saldo líquido</p>
         </div>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={dados6Meses} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -78,14 +79,19 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                 <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.95}/>
                 <stop offset="95%" stopColor="#9f1239" stopOpacity={0.95}/>
               </linearGradient>
+              <linearGradient id="barGreen" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.95}/>
+                <stop offset="95%" stopColor="#047857" stopOpacity={0.95}/>
+              </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
             <XAxis dataKey="mes" stroke="#94a3b8" fontSize={11} fontWeight={500} />
             <YAxis stroke="#94a3b8" fontSize={11} />
             <Tooltip content={<CustomTooltip />} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-            <Bar dataKey="receita" fill="url(#barBlue)" name="Receita (Bruta)" radius={[4, 4, 0, 0]} barSize={20} />
-            <Bar dataKey="despesas" fill="url(#barRed)" name="Despesas Totais" radius={[4, 4, 0, 0]} barSize={20} />
+            <Bar dataKey="receita" fill="url(#barBlue)" name="Receita (Bruta)" radius={[4, 4, 0, 0]} barSize={14} />
+            <Bar dataKey="despesas" fill="url(#barRed)" name="Despesas Totais" radius={[4, 4, 0, 0]} barSize={14} />
+            <Bar dataKey="liquido" fill="url(#barGreen)" name="Salário Líquido (Livre)" radius={[4, 4, 0, 0]} barSize={14} />
           </BarChart>
         </ResponsiveContainer>
       </div>
