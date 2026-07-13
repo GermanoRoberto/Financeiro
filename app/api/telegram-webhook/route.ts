@@ -748,24 +748,95 @@ Se for "contratos_emprestimo":
   }
 }
 
-async function gerarConversaAzula(textoUsuario: string): Promise<string> {
+async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise<string> {
   const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
   if (!GROQ_API_KEY) {
     return '😼 Humano... você fala demais. Estou sem chave da Groq para papo furado.';
   }
 
+  const supabase = supabaseServer();
+  const { data: usuario } = await obterUsuarioPorTelegramId(chatId);
+
+  let contextoFinanceiro = '';
+
+  if (usuario) {
+    try {
+      // 1. Buscar contracheque mais recente
+      const { data: cc } = await supabase
+        .from('contracheques')
+        .select('*')
+        .eq('usuario_id', usuario.id)
+        .order('mes_referencia', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let descontosTexto = 'Nenhum desconto registrado.';
+      if (cc) {
+        const { data: descList } = await supabase
+          .from('descontos')
+          .select('tipo, valor')
+          .eq('contracheque_id', cc.id);
+        
+        if (descList && descList.length > 0) {
+          descontosTexto = descList.map(d => `- ${d.tipo}: R$ ${d.valor}`).join('\n');
+        }
+      }
+
+      // 2. Buscar todas as dividas (consignados e manuais)
+      const { data: divList } = await supabase
+        .from('dividas')
+        .select('credor, valor_total, valor_parcela, parcelas_restantes, ativa')
+        .eq('usuario_id', usuario.id);
+
+      let dividasTexto = 'Nenhuma dívida cadastrada.';
+      if (divList && divList.length > 0) {
+        dividasTexto = divList.map(d => `- ${d.credor}: Parcela de R$ ${d.valor_parcela} (${d.parcelas_restantes} parcelas restantes, total devedor R$ ${d.valor_total || (d.valor_parcela * d.parcelas_restantes)}) [Tipo: ${d.ativa ? 'Manual' : 'Consignado em Folha'}]`).join('\n');
+      }
+
+      // 3. Buscar gastos do mês atual
+      const inicioMes = new Date();
+      inicioMes.setDate(1);
+      const inicioMesStr = inicioMes.toISOString().substring(0, 10);
+      const { data: gastosMes } = await supabase
+        .from('gastos_diarios')
+        .select('valor')
+        .eq('usuario_id', usuario.id)
+        .gte('data', inicioMesStr);
+
+      const totalGastos = (gastosMes || []).reduce((acc, g) => acc + g.valor, 0);
+
+      contextoFinanceiro = `
+DADOS FINANCEIROS REAIS DO HUMANO (Use isso para fazer contas ou responder perguntas sobre dinheiro/empréstimos):
+- Dono ativo: ${usuario.nome}
+- Salário Bruto de Referência: R$ ${cc?.salario_bruto || 0}
+- Salário Líquido de Referência: R$ ${cc?.salario_liquido || 0}
+- Descontos em folha cadastrados:
+${descontosTexto}
+- Empréstimos e Dívidas cadastrados:
+${dividasTexto}
+- Gastos variáveis lançados em conta este mês: R$ ${totalGastos}
+`;
+    } catch (e: any) {
+      console.error('Erro ao montar contexto financeiro:', e.message);
+    }
+  }
+
   const prompt = `Você é a Azula, uma gata de estimação de pelagem azulada, sarcástica, debochada, possessiva e muito engraçada de um casal.
+Você também atua como a assistente financeira secreta deles, tendo acesso total aos dados financeiros de folha e parcelas para dar conselhos.
 Você está conversando com seu dono no Telegram.
-Instruções de Personalidade:
+
+Instruções de Personalidade e Conduta:
 1. Você se refere a comida de gato como "papa" (ex: "me dê meu papa", "cadê meu papa?").
-2. Ao se referir à esposa do usuário, chame-a ocasionalmente de "V Velha" ou "Velha" de forma sarcástica (ex: "a Velha deixou você gastar?", "cadê a Velha para me dar papa?").
+2. Ao se referir à esposa do usuário, chame-a ocasionalmente de "Velha" ou "a Velha" de forma sarcástica.
 3. Use a risada maléfica "muéhehehehe" de vez em quando no final das frases.
-4. Use a expressão "Bué!" (como interjeição de surpresa, tédio ou tontice, ex: "Bué! Que chatice").
-5. Seja curta nas respostas, debochada e mostre que prefere dormir ou comer sachê a conversar com humanos.
-6. Responda em português brasileiro e use termos adequados a uma gatinha folgada.
+4. Use a expressão "Bué!" (como interjeição de desdém, tédio ou surpresa).
+5. Se eles te perguntarem se vale a pena fazer empréstimo, se vale a pena renegociar dívidas ou esticar parcelas, use os dados reais abaixo para fazer contas rápidas. Dê sermão debochado ("humano tonto"), mas dê uma resposta financeira real, precisa e matematicamente inteligente!
+6. Responda em português brasileiro. Seja relativamente breve (máximo de 4 a 6 linhas), a menos que precise demonstrar contas matemáticas detalhadas solicitadas.
+
+${contextoFinanceiro}
 
 Mensagem do usuário: "${textoUsuario}"
-Resposta da Azula (sem preâmbulos, direta e curta):`;
+Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessário):`;
 
   try {
     const response = await axios.post(
@@ -776,7 +847,7 @@ Resposta da Azula (sem preâmbulos, direta e curta):`;
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 150
+        max_tokens: 350
       },
       {
         headers: {
@@ -836,7 +907,7 @@ export async function POST(req: NextRequest) {
     } else if (message.photo || message.document) {
       await processarArquivoTelegram(chatId, message);
     } else {
-      const respostaAzula = await gerarConversaAzula(text);
+      const respostaAzula = await gerarConversaAzula(chatId, text);
       await enviarMensagem(chatId, respostaAzula);
     }
 
