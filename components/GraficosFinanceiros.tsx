@@ -97,16 +97,16 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
             <h3 className="text-lg font-bold text-slate-800">🥧 Composição de Descontos</h3>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Distribuição das despesas por tipo no contracheque atual</p>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={380}>
             <PieChart>
               <Pie
                 data={tipoDespesasData}
                 cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={85}
+                cy="42%"
+                innerRadius={55}
+                outerRadius={80}
                 paddingAngle={3}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                label={false}
                 dataKey="value"
               >
                 {tipoDespesasData.map((_, index) => (
@@ -114,6 +114,20 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
+              <Legend
+                layout="horizontal"
+                align="center"
+                verticalAlign="bottom"
+                iconType="circle"
+                wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
+                formatter={(value: string) => {
+                  const item = tipoDespesasData.find((d) => d.name === value);
+                  const total = tipoDespesasData.reduce((acc, d) => acc + d.value, 0);
+                  const percent = total > 0 ? ((item?.value || 0) / total * 100).toFixed(0) : 0;
+                  const nomeCurto = value.length > 28 ? value.substring(0, 26) + '...' : value;
+                  return <span className="text-slate-600 font-semibold">{nomeCurto} ({percent}%)</span>;
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>
