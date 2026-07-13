@@ -9,6 +9,7 @@ export interface ProjecaoMes {
   totalDescontos: number;
   totalDividas: number;
   totalGeral: number;
+  salarioBruto: number;
 }
 
 export function projetarDescontos(
@@ -116,6 +117,7 @@ export function projetarDescontos(
       totalDescontos,
       totalDividas,
       totalGeral: totalDescontos + totalDividas,
+      salarioBruto: _salarioBruto,
     });
   }
 

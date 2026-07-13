@@ -44,8 +44,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosProps) {
   const dados6Meses = projecao.slice(0, 6).map((mes) => ({
     mes: mes.mesFormatado.split(' ')[0].substring(0, 3).toUpperCase(),
-    descontos: mes.totalDescontos,
-    dividas: mes.totalDividas,
+    receita: mes.salarioBruto,
+    despesas: mes.totalGeral,
   }));
 
   const tipoDespesasData = projecao[0]?.descontos?.reduce((acc: any[], d) => {
@@ -65,7 +65,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
       <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
         <div className="mb-4">
           <h3 className="text-lg font-bold text-slate-800">📊 Projeção Financeira (6 Meses)</h3>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">Visão comparativa de descontos e dívidas</p>
+          <p className="text-xs text-slate-400 font-medium mt-0.5">Visão comparativa entre receitas brutas e despesas totais</p>
         </div>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={dados6Meses} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -84,8 +84,8 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
             <YAxis stroke="#94a3b8" fontSize={11} />
             <Tooltip content={<CustomTooltip />} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-            <Bar dataKey="descontos" fill="url(#barBlue)" name="Descontos" radius={[4, 4, 0, 0]} barSize={20} />
-            <Bar dataKey="dividas" fill="url(#barRed)" name="Dívidas" radius={[4, 4, 0, 0]} barSize={20} />
+            <Bar dataKey="receita" fill="url(#barBlue)" name="Receita (Bruta)" radius={[4, 4, 0, 0]} barSize={20} />
+            <Bar dataKey="despesas" fill="url(#barRed)" name="Despesas Totais" radius={[4, 4, 0, 0]} barSize={20} />
           </BarChart>
         </ResponsiveContainer>
       </div>
