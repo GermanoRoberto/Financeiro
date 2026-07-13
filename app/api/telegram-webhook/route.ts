@@ -969,8 +969,20 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
     );
 
     return response.data.choices?.[0]?.message?.content || '😼 Bué!';
-  } catch (error) {
-    console.error('Erro ao gerar conversa com Groq:', error);
+  } catch (error: any) {
+    console.warn('Erro ao gerar conversa com Groq, tentando Gemini...', error.message);
+    try {
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+      if (GEMINI_API_KEY) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+        const response = await axios.post(url, {
+          contents: [{ parts: [{ text: prompt }] }]
+        });
+        return response.data.candidates?.[0]?.content?.parts?.[0]?.text || '😼 Bué!';
+      }
+    } catch (geminiErr: any) {
+      console.error('Erro no fallback do Gemini para conversa:', geminiErr.message);
+    }
     return '😼 Bué! Estou com preguiça de conversar agora.';
   }
 }

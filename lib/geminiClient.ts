@@ -130,6 +130,56 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   return JSON.parse(jsonStr);
 }
 
+async function extrairComGemini(base64OrText: string, mimeType: string, prompt: string, isTextOnly: boolean): Promise<any> {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY não configurada no .env/Vercel.');
+  }
+
+  let contents: any[] = [];
+  if (isTextOnly) {
+    contents = [
+      {
+        parts: [{ text: prompt }]
+      }
+    ];
+  } else {
+    contents = [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64OrText
+            }
+          }
+        ]
+      }
+    ];
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const response = await axios.post(
+    url,
+    {
+      contents,
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(jsonStr);
+}
+
 export async function extrairComFallback(base64: string, mimeType: string, prompt: string): Promise<any> {
   let promptFinal = prompt;
   let base64OrText = base64;
@@ -159,13 +209,22 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     }
   }
 
-  // Usar exclusivamente o Groq (Gemini desativado conforme solicitado pelo usuário para evitar erros de quota 429)
+  // Tenta extrair com Groq primeiro
   try {
-    console.log('Iniciando extração exclusiva via Groq...');
+    console.log('Iniciando extração via Groq...');
     return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
   } catch (groqError: any) {
-    const errorDetails = groqError.response?.data?.error?.message || groqError.message;
-    throw new Error(`Falha na extração de dados com Groq. (Erro: ${errorDetails})`);
+    const groqMsg = groqError.response?.data?.error?.message || groqError.message;
+    console.warn(`Falha na extração com Groq: ${groqMsg}. Tentando fallback automático para Gemini...`);
+    
+    // Se falhar (ex: chave inválida ou erro na API da Groq), tenta com Gemini
+    try {
+      return await extrairComGemini(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
+    } catch (geminiError: any) {
+      const geminiMsg = geminiError.response?.data?.error?.message || geminiError.message;
+      console.error(`Falha no fallback para Gemini: ${geminiMsg}`);
+      throw new Error(`Ambos os serviços de extração de dados falharam. Groq: ${groqMsg} | Gemini: ${geminiMsg}`);
+    }
   }
 }
 
