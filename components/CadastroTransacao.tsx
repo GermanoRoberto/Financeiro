@@ -71,7 +71,7 @@ export default function CadastroTransacao({ usuarioId, onSuccess }: CadastroTran
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
             Tipo de Transação
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setTipo('despesa')}
@@ -81,7 +81,7 @@ export default function CadastroTransacao({ usuarioId, onSuccess }: CadastroTran
                   : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-slate-200'
               }`}
             >
-              💸 Despesa (Gasto)
+              💸 Despesa
             </button>
             <button
               type="button"
@@ -103,12 +103,12 @@ export default function CadastroTransacao({ usuarioId, onSuccess }: CadastroTran
                   : 'bg-slate-950/40 border-white/5 text-slate-400 hover:text-slate-200'
               }`}
             >
-              🔄 Transferência
+              🔄 Transf.
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
               Valor (R$)
@@ -120,7 +120,7 @@ export default function CadastroTransacao({ usuarioId, onSuccess }: CadastroTran
               onChange={(e) => setValor(e.target.value)}
               placeholder="0,00"
               required
-              className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
@@ -133,7 +133,7 @@ export default function CadastroTransacao({ usuarioId, onSuccess }: CadastroTran
               value={data}
               onChange={(e) => setData(e.target.value)}
               required
-              className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
         </div>

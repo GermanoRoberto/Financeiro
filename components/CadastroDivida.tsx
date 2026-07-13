@@ -63,12 +63,14 @@ export default function CadastroDivida({ usuarioId, onSuccess }: CadastroDividaP
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-8 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">💳 Cadastrar Dívida</h2>
+    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md shadow-2xl">
+      <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+        <span>💳</span> Cadastrar Dívida
+      </h2>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
             Credor/Estabelecimento *
           </label>
           <input
@@ -76,14 +78,14 @@ export default function CadastroDivida({ usuarioId, onSuccess }: CadastroDividaP
             value={formData.credor}
             onChange={(e) => setFormData({ ...formData, credor: e.target.value })}
             placeholder="Ex: Banco X, Financeira Y"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2.5 bg-slate-950/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Valor Total
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Valor Total (Opcional)
             </label>
             <input
               type="number"
@@ -91,11 +93,11 @@ export default function CadastroDivida({ usuarioId, onSuccess }: CadastroDividaP
               value={formData.valor_total}
               onChange={(e) => setFormData({ ...formData, valor_total: e.target.value })}
               placeholder="0.00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-slate-950/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Valor da Parcela *
             </label>
             <input
@@ -104,14 +106,14 @@ export default function CadastroDivida({ usuarioId, onSuccess }: CadastroDividaP
               value={formData.valor_parcela}
               onChange={(e) => setFormData({ ...formData, valor_parcela: e.target.value })}
               placeholder="0.00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-slate-950/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Parcelas Restantes *
             </label>
             <input
@@ -119,12 +121,12 @@ export default function CadastroDivida({ usuarioId, onSuccess }: CadastroDividaP
               value={formData.parcelas_restantes}
               onChange={(e) => setFormData({ ...formData, parcelas_restantes: e.target.value })}
               placeholder="0"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-slate-950/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vencimento (dia do mês)
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Vencimento (Dia do Mês)
             </label>
             <input
               type="number"
@@ -133,25 +135,25 @@ export default function CadastroDivida({ usuarioId, onSuccess }: CadastroDividaP
               value={formData.vencimento_dia}
               onChange={(e) => setFormData({ ...formData, vencimento_dia: e.target.value })}
               placeholder="1-31"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-slate-950/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all text-sm"
             />
           </div>
         </div>
 
-        <label className="flex items-center">
+        <label className="flex items-center gap-2 cursor-pointer py-1 select-none">
           <input
             type="checkbox"
             checked={formData.conjunta}
             onChange={(e) => setFormData({ ...formData, conjunta: e.target.checked })}
-            className="w-4 h-4 text-blue-600 rounded"
+            className="w-4.5 h-4.5 text-blue-600 rounded bg-slate-950/40 border-white/10 focus:ring-0 cursor-pointer"
           />
-          <span className="ml-2 text-sm text-gray-700">Dívida do casal (visível para ambos)</span>
+          <span className="text-sm text-slate-300">Dívida conjunta do casal</span>
         </label>
 
         <button
           type="submit"
           disabled={carregando}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
+          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-3 rounded-xl font-semibold shadow-lg shadow-blue-950/20 active:scale-[0.98] transition-all disabled:opacity-50 text-sm mt-2"
         >
           {carregando ? 'Salvando...' : 'Cadastrar Dívida'}
         </button>
