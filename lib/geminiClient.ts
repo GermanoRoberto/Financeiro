@@ -79,54 +79,83 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   }
 
   const isImage = mimeType.startsWith('image/');
-  const model = isImage && !isTextOnly ? 'qwen/qwen3.6-27b' : 'llama-3.3-70b-versatile';
+  
+  // Lista de candidatos de modelos de imagem (Visão/OCR)
+  const visionCandidates = [
+    process.env.GROQ_VISION_MODEL,
+    'qwen/qwen3.6-27b',
+    'meta-llama/llama-4-scout-17b-16e-instruct'
+  ].filter(Boolean) as string[];
 
-  const messages: any[] = [];
-  if (isImage && !isTextOnly) {
-    messages.push({
-      role: 'user',
-      content: [
-        { type: 'text', text: prompt },
-        {
-          type: 'image_url',
-          image_url: {
-            url: `data:${mimeType};base64,${base64}`
-          }
-        }
-      ]
-    });
-  } else {
-    messages.push({
-      role: 'user',
-      content: prompt
-    });
-  }
+  // Lista de candidatos de modelos de texto
+  const textCandidates = [
+    process.env.GROQ_TEXT_MODEL,
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant'
+  ].filter(Boolean) as string[];
 
-  const payload: any = {
-    model: model,
-    messages: messages,
-    temperature: 0.1
-  };
+  const candidates = isImage && !isTextOnly ? visionCandidates : textCandidates;
+  let lastError: any = null;
 
-  // Se for o modelo Qwen de visão, também evitamos enviar response_format por segurança caso venha a falhar, tratando a resposta de markdown no Javascript
-  if (model !== 'qwen/qwen3.6-27b') {
-    payload.response_format = { type: 'json_object' };
-  }
-
-  const response = await axios.post(
-    'https://api.groq.com/openai/v1/chat/completions',
-    payload,
-    {
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
+  for (const model of candidates) {
+    try {
+      console.log(`Tentando extrair dados com o modelo Groq: ${model}...`);
+      
+      const messages: any[] = [];
+      if (isImage && !isTextOnly) {
+        messages.push({
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64}`
+              }
+            }
+          ]
+        });
+      } else {
+        messages.push({
+          role: 'user',
+          content: prompt
+        });
       }
-    }
-  );
 
-  const textContent = response.data.choices?.[0]?.message?.content || '';
-  const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  return JSON.parse(jsonStr);
+      const payload: any = {
+        model: model,
+        messages: messages,
+        temperature: 0.1
+      };
+
+      // Apenas forçamos response_format json_object nos modelos Llama de texto conhecidos para evitar quebras em outros modelos
+      if (model.includes('llama-3.3') || model.includes('llama-3.1')) {
+        payload.response_format = { type: 'json_object' };
+      }
+
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      const textContent = response.data.choices?.[0]?.message?.content || '';
+      const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      return JSON.parse(jsonStr);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error?.message || err.message;
+      console.warn(`Falha na chamada com o modelo Groq ${model}: ${errMsg}. Tentando próximo candidato...`);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('Nenhum modelo da Groq conseguiu processar a requisição.');
 }
 
 async function extrairComGemini(base64OrText: string, mimeType: string, prompt: string, isTextOnly: boolean): Promise<any> {
@@ -184,6 +213,7 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
   let base64OrText = base64;
   let mimeTypeFinal = mimeType;
   let isTextOnly = false;
+  let extractedPdfText = '';
 
   // Se for um arquivo PDF, vamos extrair o texto localmente via pdf-parse.
   if (mimeType === 'application/pdf') {
@@ -194,6 +224,7 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
       const dataResult = await pdf(buffer);
       
       if (dataResult && dataResult.text && dataResult.text.trim().length > 0) {
+        extractedPdfText = dataResult.text;
         base64OrText = dataResult.text;
         mimeTypeFinal = 'text/plain';
         isTextOnly = true;
@@ -208,7 +239,45 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     }
   }
 
-  // Tenta extrair com Groq primeiro
+  // REGRA LOCAL (Sem Dependência de IA): Verifica se o PDF bate com padrões conhecidos
+  if (isTextOnly && extractedPdfText) {
+    try {
+      // 1. Fatura Vivo
+      if (extractedPdfText.includes('Sua Fatura Digital Vivo') || (extractedPdfText.includes('Resumo de fatura') && extractedPdfText.includes('Valor da fatura'))) {
+        console.log('Detectada Fatura Vivo! Processando localmente sem IA...');
+        const matchValor = extractedPdfText.match(/Valor da fatura:\s*R\$\s*([\d,.]+)/i);
+        const matchVencimento = extractedPdfText.match(/Data de vencimento:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+        
+        if (matchValor && matchVencimento) {
+          const valor = parseFloat(matchValor[1].replace(/\./g, '').replace(',', '.'));
+          const dataISO = `${matchVencimento[3]}-${matchVencimento[2]}-${matchVencimento[1]}`;
+          return {
+            tipo_documento: 'comprovante_gasto',
+            valor: valor,
+            estabelecimento: 'Vivo',
+            categoria: 'outros',
+            data: dataISO
+          };
+        }
+      }
+
+      // 2. Extrato Nubank de Germano
+      if (extractedPdfText.includes('Saldo final do período') && extractedPdfText.includes('Germano Roberto do Carmo') && extractedPdfText.includes('VALORES EM R$')) {
+        console.log('Detectado Extrato Nubank! Processando localmente sem IA...');
+        const transacoes = parseNubankLocal(extractedPdfText);
+        if (transacoes && transacoes.length > 0) {
+          return {
+            tipo_documento: 'extrato_bancario',
+            transacoes: transacoes
+          };
+        }
+      }
+    } catch (localError: any) {
+      console.warn('Falha ao rodar parser local de regex:', localError.message);
+    }
+  }
+
+  // Tenta extrair com Groq primeiro se não bater nas regras locais
   try {
     console.log('Iniciando extração via Groq...');
     return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
@@ -225,6 +294,113 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
       throw new Error(`Ambos os serviços de extração de dados falharam. Groq: ${groqMsg} | Gemini: ${geminiMsg}`);
     }
   }
+}
+
+function parseNubankLocal(text: string): any[] {
+  const dateRegex = /(\d{2})\s+([A-Z]{3})\s+(\d{4})/g;
+  const dates: any[] = [];
+  let match;
+
+  while ((match = dateRegex.exec(text)) !== null) {
+    dates.push({
+      dateStr: match[0],
+      day: match[1],
+      monthStr: match[2],
+      year: match[3],
+      index: match.index
+    });
+  }
+
+  const transactions: any[] = [];
+  const meses: Record<string, string> = {
+    'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06',
+    'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12',
+    'AGO': '08', 'SET': '09', 'OUT': '10', 'DEZ': '12'
+  };
+
+  for (let i = 0; i < dates.length; i++) {
+    const currentDate = dates[i];
+    const nextDate = dates[i + 1];
+    const segment = text.substring(currentDate.index, nextDate ? nextDate.index : text.length);
+
+    const mesNum = meses[currentDate.monthStr.toUpperCase()] || '07';
+    const formattedDate = `${currentDate.year}-${mesNum}-${currentDate.day}`;
+
+    const lines = segment.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    for (let j = 0; j < lines.length; j++) {
+      const line = lines[j];
+      
+      if (line.includes('Total de entradas') || line.includes('Total de saídas') || line.includes('Saldo final') || line.includes('Extrato gerado')) {
+        continue;
+      }
+
+      const isDebito = line.includes('Compra no débito') || line.includes('debito');
+      const isPixEnviado = line.includes('Transferência enviada pelo Pix') || line.includes('enviada pelo Pix');
+      const isPixRecebido = line.includes('Transferência recebida pelo Pix') || line.includes('recebida pelo Pix');
+      const isTransferenciaRecebida = line.includes('Transferência Recebida') || line.includes('Recebida');
+      
+      if (isDebito || isPixEnviado || isPixRecebido || isTransferenciaRecebida) {
+        let valor = 0;
+        let estabelecimento = 'Não identificado';
+        let categoria = 'outros';
+
+        if (line.includes('NuPay99')) {
+          const matchNuPay = line.match(/NuPay99\s*([\d\.]+,?\d{2})/i);
+          if (matchNuPay) {
+            const valStr = matchNuPay[1].replace(/\./g, '').replace(',', '.');
+            valor = parseFloat(valStr);
+            estabelecimento = 'NuPay 99';
+          }
+        } else {
+          let cleanLine = line
+            .replace(/Compra no débito via NuPay/gi, '')
+            .replace(/Compra no débito/gi, '')
+            .replace(/Transferência enviada pelo Pix/gi, '')
+            .replace(/Transferência recebida pelo Pix/gi, '')
+            .replace(/Transferência recebida pelo Pix via/gi, '')
+            .replace(/Transferência Recebida/gi, '')
+            .replace(/Transferência recebida/gi, '')
+            .replace(/Transferência enviada/gi, '')
+            .trim();
+
+          const matchVal = cleanLine.match(/^(.*?)([\d\.]+,?\d{2})$/);
+          if (matchVal) {
+            estabelecimento = matchVal[1].trim();
+            const valStr = matchVal[2].replace(/\./g, '').replace(',', '.');
+            valor = parseFloat(valStr);
+            
+            estabelecimento = estabelecimento
+              .replace(/^-/, '')
+              .replace(/-\s*•••\..*$/, '')
+              .replace(/via\s*Open Banking/gi, '')
+              .trim();
+              
+            if (!estabelecimento) estabelecimento = 'Estabelecimento';
+          }
+        }
+
+        if (isPixRecebido || isTransferenciaRecebida) {
+          categoria = 'receita_extra';
+        } else if (estabelecimento.toLowerCase().includes('uber') || estabelecimento.toLowerCase().includes('99')) {
+          categoria = 'transporte';
+        } else if (estabelecimento.toLowerCase().includes('spotify') || estabelecimento.toLowerCase().includes('netflix')) {
+          categoria = 'diversão';
+        }
+
+        if (valor > 0) {
+          transactions.push({
+            data: formattedDate,
+            valor: valor,
+            estabelecimento: estabelecimento,
+            categoria: categoria
+          });
+        }
+      }
+    }
+  }
+
+  return transactions;
 }
 
 export async function extrairContrachequeDoBase64(base64: string, mimeType: string): Promise<any> {

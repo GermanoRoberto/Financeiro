@@ -950,26 +950,46 @@ Mensagem do usuário: "${textoUsuario}"
 Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessário):`;
 
   try {
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 350
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const modelCandidates = [
+    process.env.GROQ_TEXT_MODEL,
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant'
+  ].filter(Boolean) as string[];
 
-    return response.data.choices?.[0]?.message?.content || '😼 Bué!';
-  } catch (error: any) {
+  let lastChatError: any = null;
+
+  for (const model of modelCandidates) {
+    try {
+      console.log(`Tentando conversa com modelo Groq: ${model}...`);
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: model,
+          messages: [
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 350
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 8000
+        }
+      );
+
+      return response.data.choices?.[0]?.message?.content || '😼 Bué!';
+    } catch (error: any) {
+      console.warn(`Falha na conversa com o modelo Groq ${model}: ${error.message}. Tentando próximo candidato...`);
+      lastChatError = error;
+    }
+  }
+
+  // Se todos os modelos da Groq falharem, lança erro para cair no fallback do Gemini abaixo
+  throw lastChatError || new Error('Nenhum modelo da Groq conseguiu processar o chat.');
+} catch (error: any) {
     console.warn('Erro ao gerar conversa com Groq, tentando Gemini...', error.message);
     try {
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
