@@ -199,6 +199,20 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     }
   };
 
+  const alterarCategoriaGasto = async (id: string, novaCategoria: string) => {
+    try {
+      const { error } = await supabase
+        .from('gastos_diarios')
+        .update({ categoria: novaCategoria })
+        .eq('id', id);
+      if (error) throw error;
+      toast.success('Categoria atualizada!');
+      carregarDados();
+    } catch (err: any) {
+      toast.error('Erro ao alterar categoria: ' + err.message);
+    }
+  };
+
   if (carregando) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
@@ -350,25 +364,31 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                             const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
                             const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
                             
-                            const emojisMap: any = {
-                              'alimentação': '🍔',
-                              'transporte': '🚗',
-                              'saúde': '💊',
-                              'diversão': '🎮',
-                              'receita_extra': '💰',
-                              'transferencia': '🔄',
-                              'outros': '📦'
-                            };
-                            const emoji = emojisMap[g.categoria || 'outros'] || '📦';
-
                             const isReceita = g.categoria === 'receita_extra';
                             const isTransf = g.categoria === 'transferencia';
 
                             return (
                               <tr key={g.id} className="hover:bg-white/5 transition-colors">
                                 <td className="py-3.5 pr-4 font-semibold text-white capitalize">{g.estabelecimento || 'Não identificado'}</td>
-                                <td className="py-3.5 pr-4 text-slate-300 capitalize flex items-center gap-1.5">
-                                  <span>{emoji}</span> <span>{g.categoria?.replace('_', ' ') || 'outros'}</span>
+                                <td className="py-3.5 pr-4 text-slate-300">
+                                  <select
+                                    value={g.categoria || 'outros'}
+                                    onChange={(e) => alterarCategoriaGasto(g.id, e.target.value)}
+                                    className="bg-slate-900/90 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer font-medium"
+                                  >
+                                    <option value="alimentação" className="bg-slate-950">🍔 Alimentação</option>
+                                    <option value="transporte" className="bg-slate-950">🚗 Transporte</option>
+                                    <option value="saúde" className="bg-slate-950">💊 Saúde</option>
+                                    <option value="diversão" className="bg-slate-950">🎮 Diversão</option>
+                                    <option value="moradia" className="bg-slate-950">🏠 Moradia</option>
+                                    <option value="educação" className="bg-slate-950">🎓 Educação</option>
+                                    <option value="compras" className="bg-slate-950">🛍️ Compras</option>
+                                    <option value="serviços" className="bg-slate-950">🛠️ Serviços/Assinaturas</option>
+                                    <option value="investimentos" className="bg-slate-950">📈 Investimentos</option>
+                                    <option value="receita_extra" className="bg-slate-950">💰 Receita Extra</option>
+                                    <option value="transferencia" className="bg-slate-950">🔄 Transferência</option>
+                                    <option value="outros" className="bg-slate-950">📦 Outros</option>
+                                  </select>
                                 </td>
                                 <td className={`py-3.5 pr-4 font-bold ${
                                   isReceita 

@@ -103,8 +103,19 @@ const botoesCategorias = (gastoId: string) => [
     { text: '🎮 Diversão', callback_data: `cat_diversao_${gastoId}` }
   ],
   [
-    { text: '📦 Outros', callback_data: `cat_outros_${gastoId}` },
-    { text: '❌ Excluir', callback_data: `del_${gastoId}` }
+    { text: '🏠 Moradia', callback_data: `cat_moradia_${gastoId}` },
+    { text: '🎓 Educação', callback_data: `cat_educacao_${gastoId}` }
+  ],
+  [
+    { text: '🛍️ Compras', callback_data: `cat_compras_${gastoId}` },
+    { text: '🛠️ Serviços', callback_data: `cat_servicos_${gastoId}` }
+  ],
+  [
+    { text: '📈 Invest.', callback_data: `cat_investimentos_${gastoId}` },
+    { text: '📦 Outros', callback_data: `cat_outros_${gastoId}` }
+  ],
+  [
+    { text: '❌ Excluir Lançamento', callback_data: `del_${gastoId}` }
   ]
 ];
 
@@ -126,6 +137,11 @@ async function handleCallbackQuery(callbackQuery: any) {
         transporte: 'transporte',
         saude: 'saúde',
         diversao: 'diversão',
+        moradia: 'moradia',
+        educacao: 'educação',
+        compras: 'compras',
+        servicos: 'serviços',
+        investimentos: 'investimentos',
         receitaextra: 'receita_extra',
         transferencia: 'transferencia',
         outros: 'outros'
@@ -471,7 +487,7 @@ Se for "comprovante_gasto":
   "tipo_documento": "comprovante_gasto",
   "valor": number (Valor total pago/transferido ou valor total da fatura/boleto a pagar),
   "estabelecimento": string (Nome da empresa emissora da fatura, mercado, loja, credor ou recebedor, ex: "Vivo", "Coelba", "Uber"),
-  "categoria": string ("alimentação", "transporte", "saúde", "diversão", "receita_extra", "transferencia", "outros"),
+  "categoria": string ("alimentação"|"transporte"|"saúde"|"diversão"|"moradia"|"educação"|"compras"|"serviços"|"investimentos"|"receita_extra"|"transferencia"|"outros"),
   "data": "YYYY-MM-DD" (Data do gasto ou data de vencimento da fatura/cobrança)
 }
 
@@ -497,7 +513,7 @@ Se for "extrato_bancario":
     {
       "valor": number (Valor absoluto do lançamento como número decimal positivo. Não coloque sinal de menos. Ex: 27.00 ou 920.00),
       "estabelecimento": string (Nome da pessoa, empresa ou descrição da transação, ex: "GabrielDeAlmeida" ou "Priscila Aparecida..."),
-      "categoria": string ("alimentação"|"transporte"|"saúde"|"diversão"|"receita_extra"|"transferencia"|"outros". 
+      "categoria": string ("alimentação"|"transporte"|"saúde"|"diversão"|"moradia"|"educação"|"compras"|"serviços"|"investimentos"|"receita_extra"|"transferencia"|"outros". 
                           Dica: se for transferência entre o casal, use "transferencia". 
                           Se for recebimento de terceiros que não seja do cônjuge, use "receita_extra". 
                           Se for débito/compra, use a categoria correspondente.),

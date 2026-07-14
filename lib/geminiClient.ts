@@ -54,21 +54,26 @@ Extraia as informações e responda APENAS com um objeto JSON válido, sem markd
 Instruções de Extração:
 1. "valor": O valor total pago, transferido, recebido ou o valor total da fatura/boleto a pagar (ex: 85.00). Deve ser um número decimal.
 2. "estabelecimento": O nome da empresa emissora da fatura, mercado, loja ou pessoa recebedora (credor/beneficiário, ex: "Vivo", "Claro", "Coelba"). Em caso de PIX recebido, coloque o nome do pagador. Em caso de transferência entre o casal, coloque o nome de quem recebeu a transferência (ex: "Para Priscila" ou "Para Germano").
-3. "categoria": Classifique a transação em uma das seguintes opções exatas: "alimentação", "transporte", "saúde", "diversão", "receita_extra", "transferencia", "outros".
+3. "categoria": Classifique a transação em uma das seguintes opções exatas: "alimentação", "transporte", "saúde", "diversão", "moradia", "educação", "compras", "serviços", "investimentos", "receita_extra", "transferencia", "outros".
    - "alimentação": Supermercados, restaurantes, padarias, iFood, lanchonetes.
    - "transporte": Postos de combustível, Uber, 99, passagens, pedágio, estacionamento.
    - "saúde": Farmácias, médicos, exames, dentistas.
-   - "diversão": Cinema, shows, streaming, jogos, viagens de lazer.
+   - "diversão": Cinema, shows, streaming de lazer, jogos, viagens de lazer, passeios.
+   - "moradia": Contas de consumo residenciais (aluguel, condomínio, água, luz, gás, internet residencial, IPTU, manutenção da casa).
+   - "educação": Cursos, faculdade, escola, livros didáticos, mensalidades escolares.
+   - "compras": Roupas, calçados, eletrônicos, móveis, presentes, lojas de departamentos.
+   - "serviços": Assinaturas recorrentes de aplicativos/serviços (Spotify, Netflix, academia, licenças), cabeleireiro, prestadores de serviços gerais.
+   - "investimentos": Transferências para contas de investimento, poupança, aportes.
    - "receita_extra": Entradas de dinheiro, PIX recebido de terceiros, bônus, salários adicionais, dinheiro extra ganho (que não seja transferência do próprio cônjuge).
    - "transferencia": Dinheiro transferido entre o casal (ex: PIX do marido para a esposa, ou da esposa para o marido).
-   - "outros": Contas de consumo, telefone, internet, tarifas, impostos ou qualquer gasto/transação que não se encaixe nas categorias acima.
+   - "outros": Qualquer gasto/transação que não se encaixe nas categorias acima.
 4. "data": A data em que o gasto/transação foi realizado ou a data de vencimento da fatura, no formato "YYYY-MM-DD" (ex: "2026-07-21"). Se não encontrar a data, use a data atual.
 
 Formato do JSON de retorno esperado:
 {
   "valor": 0.00,
   "estabelecimento": "Nome do Estabelecimento ou Recebedor",
-  "categoria": "alimentação"|"transporte"|"saúde"|"diversão"|"receita_extra"|"transferencia"|"outros",
+  "categoria": "alimentação"|"transporte"|"saúde"|"diversão"|"moradia"|"educação"|"compras"|"serviços"|"investimentos"|"receita_extra"|"transferencia"|"outros",
   "data": "YYYY-MM-DD"
 }`;
 

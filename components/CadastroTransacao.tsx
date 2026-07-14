@@ -170,6 +170,11 @@ export default function CadastroTransacao({ usuarioId, onSuccess }: CadastroTran
               <option value="transporte" className="bg-slate-900">🚗 Transporte</option>
               <option value="saúde" className="bg-slate-900">💊 Saúde</option>
               <option value="diversão" className="bg-slate-900">🎮 Diversão</option>
+              <option value="moradia" className="bg-slate-900">🏠 Moradia</option>
+              <option value="educação" className="bg-slate-900">🎓 Educação</option>
+              <option value="compras" className="bg-slate-900">🛍️ Compras</option>
+              <option value="serviços" className="bg-slate-900">🛠️ Serviços/Assinaturas</option>
+              <option value="investimentos" className="bg-slate-900">📈 Investimentos</option>
               <option value="outros" className="bg-slate-900">📦 Outros</option>
             </select>
           </div>
