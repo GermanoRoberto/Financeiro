@@ -967,8 +967,7 @@ ${contextoFinanceiro}
 Mensagem do usuário: "${textoUsuario}"
 Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessário):`;
 
-  try {
-    const modelCandidates = [
+  const modelCandidates = [
     process.env.GROQ_TEXT_MODEL,
     'llama-3.3-70b-versatile',
     'llama-3.1-8b-instant'
@@ -1005,24 +1004,8 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
     }
   }
 
-  // Se todos os modelos da Groq falharem, lança erro para cair no fallback do Gemini abaixo
-  throw lastChatError || new Error('Nenhum modelo da Groq conseguiu processar o chat.');
-} catch (error: any) {
-    console.warn('Erro ao gerar conversa com Groq, tentando Gemini...', error.message);
-    try {
-      const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-      if (GEMINI_API_KEY) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-        const response = await axios.post(url, {
-          contents: [{ parts: [{ text: prompt }] }]
-        });
-        return response.data.candidates?.[0]?.content?.parts?.[0]?.text || '😼 Bué!';
-      }
-    } catch (geminiErr: any) {
-      console.error('Erro no fallback do Gemini para conversa:', geminiErr.message);
-    }
-    return '😼 Bué! Estou com preguiça de conversar agora.';
-  }
+  console.error('Todos os modelos da Groq falharam para chat:', lastChatError?.message);
+  return '😼 Humano... a Groq está com soluço agora. Tente falar comigo de novo em alguns segundos!';
 }
 
 export async function POST(req: NextRequest) {
