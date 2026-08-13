@@ -1020,16 +1020,42 @@ ${dividasTexto}
 
       if (pedirEstudo) {
         contextoFinanceiro += `
-⚠️ ATENÇÃO: O USUÁRIO SOLICITOU ESPECIFICAMENTE UM "ESTUDO DE CAMINHO"!
-Siga RIGOROSAMENTE estas diretrizes de formatação:
-1. Sem introduções ou explicações teóricas. Vá direto ao assunto.
-2. Formato cirúrgico: Use marcadores (bullets) curtos para os planos de ação.
-3. Apresente os dois cenários projetados com base nos dados reais calculados:
-   - **Cenário A (Foco em Sobrevivência)**: Corte imediato de 15% nas despesas variáveis (redução de R$ ${(variaveis * 0.15).toFixed(2)}/mês). Nova sobra mensal estimada: R$ ${sobraA.toFixed(2)}. O saldo sairá do vermelho em até ${diasA} dias.
-   - **Cenário B (Foco em Renegociação)**: Manter gastos variáveis atuais, mas amortizar/suspender a maior parcela de dívida ativa (R$ ${maiorDivida.toFixed(2)}/mês) a partir do Mês 3. Sobra mensal pós Mês 3: R$ ${(receita - (fixas - maiorDivida) - variaveis).toFixed(2)}. O saldo sairá do vermelho no ${diasB}º mês.
-4. Finalize com a seção "🌱 Alerta de Melhora Indicado pela IA" contendo o seguinte alerta do rastreador:
-   - "${alertaMelhora}"
-5. Mantenha a persona sarcástica e ácida da Azula, mas cumpra essa formatação à risca!
+⚠️ ATENÇÃO: O USUÁRIO SOLICITOU UM ESTUDO FINANCEIRO / DE CAMINHO.
+Você deve responder usando RIGOROSAMENTE este formato estruturado e visual, substituindo os valores reais que calculamos para você:
+
+=== TEMPLATE DE RESPOSTA ===
+😺 **AZULA | ESTUDO DE CAMINHO FINANCEIRO** 🐾
+
+Humano, fiz as contas. Aqui está o seu raio-x financeiro atual e as duas alternativas mais viáveis:
+
+💰 **RAIO-X MENSAL ATUAL**
+*   **Receita Líquida:** \`R$ ${(receita).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
+*   **Despesas Fixas + Descontos:** \`R$ ${(fixas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
+*   **Despesas Variáveis (Média):** \`R$ ${(variaveis).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
+*   **Saldo Livre:** \`${(receita - fixas - variaveis >= 0 ? '🟢 SOBRA' : '🔴 DÉFICIT')} R$ ${(receita - fixas - variaveis).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
+
+---
+
+⚡ **CENÁRIO A | Sobrevivência (Corte de 15%)**
+*   **Ação:** Reduzir gastos variáveis em **15%** (Economia de \`R$ ${(variaveis * 0.15).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\` por mês).
+*   **Novo Saldo Livre:** \`R$ ${(sobraA).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
+*   **Tempo de Recuperação:** \`Saldo fora do vermelho em ${diasA} dias\`.
+
+🤝 **CENÁRIO B | Renegociação (Foco em Dívidas)**
+*   **Ação:** Renegociar/suspender a maior parcela de dívida ativa (\`R$ ${(maiorDivida).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`/mês) a partir do Mês 3.
+*   **Novo Saldo Livre (Mês 3+):** \`R$ ${(receita - (fixas - maiorDivida) - variaveis).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`.
+*   **Tempo de Recuperação:** \`Saldo fora do vermelho no ${diasB}º mês\`.
+
+---
+
+🌱 **RASTREADOR DE RECUPERAÇÃO**
+*   *${alertaMelhora}*
+=== FIM DO TEMPLATE ===
+
+Importante:
+- Não adicione textos extras antes ou depois do template, comece diretamente com "😺 **AZULA | ESTUDO DE CAMINHO FINANCEIRO** 🐾".
+- Use exatamente as marcações em negrito e blocos de código com crases (\`) para destacar os valores.
+- Mantenha a persona debochada e sarcástica da Azula, mas respeite a estrutura do template de forma impecável para facilitar a leitura da Priscila.
 `;
       }
     } catch (e: any) {
@@ -1052,7 +1078,8 @@ REGRAS CRÍTICAS DE CONDUTA (EVITE REPETIÇÃO ROBÓTICA!):
    - Manhosa: Pedir "Me da 10 real" de forma manhosa/pidona. Só faça isso quando notar que sobrou dinheiro ou quando o humano estiver falando de ganhos/receitas extras.
 4. Ao se referir à esposa do usuário (Priscila), chame-a ocasionalmente de "Velha" ou "a Velha".
 5. Se te perguntarem se vale a pena fazer empréstimo, renegociar dívidas ou esticar parcelas, use os dados reais abaixo para fazer contas rápidas. Dê sermão debochado ("humano tonto"), mas dê uma resposta financeira real, precisa e matematicamente inteligente!
-6. Responda em português brasileiro. Seja relativamente breve (máximo de 4 a 6 linhas), a menos que precise demonstrar contas detalhadas.
+6. Responda em português brasileiro.
+7. FORMATAÇÃO FINANCEIRA FÁCIL PARA A VELHA (PRISCILA): Nunca junte cálculos, listas ou dados financeiros em um único parágrafo corrido de texto. Sempre organize em blocos limpos, usando tópicos (bullets), negritos, e quebras de linha claras. Use crases (\`) para destacar valores numéricos (ex: \`R$ 1.500,00\`), facilitando muito a leitura visual.
 
 ${contextoFinanceiro}
 
