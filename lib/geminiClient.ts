@@ -211,7 +211,7 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
   let isTextOnly = false;
   let extractedPdfText = '';
 
-  // Se for um arquivo PDF, vamos extrair o texto localmente via pdf-parse.
+  // Se for um arquivo PDF, vamos tentar extrair o texto localmente via pdf-parse.
   if (mimeType === 'application/pdf') {
     try {
       console.log('Extraindo texto do PDF via pdf-parse...');
@@ -227,11 +227,16 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
         promptFinal = `${prompt}\n\n[Texto extraído do PDF]:\n${base64OrText}`;
         console.log(`Texto extraído do PDF com sucesso (${base64OrText.length} caracteres).`);
       } else {
-        throw new Error('O PDF parece estar vazio ou não possui texto copiável (pode ser um documento escaneado/imagem).');
+        console.log('O PDF parece ser uma imagem (sem texto copiável). Acionando fallback do Gemini para PDF visual...');
+        return await extrairComGeminiPDF(base64, prompt);
       }
     } catch (pdfError: any) {
-      console.error(`Erro ao extrair texto do PDF via pdf-parse: ${pdfError.message}`);
-      throw new Error(`Não consegui ler as informações do PDF. Certifique-se de que o PDF tem texto selecionável e não é uma imagem escaneada. (Erro: ${pdfError.message})`);
+      console.log(`Erro no pdf-parse (${pdfError.message}). Acionando fallback do Gemini para PDF visual...`);
+      try {
+        return await extrairComGeminiPDF(base64, prompt);
+      } catch (geminiError: any) {
+        throw new Error(`Não consegui ler as informações do PDF. Erro de OCR: ${geminiError.message}`);
+      }
     }
   }
 
@@ -569,6 +574,43 @@ function parseCaixaTxtLocal(text: string): any[] {
     }
   }
   return transactions;
+}
+
+async function extrairComGeminiPDF(base64: string, prompt: string): Promise<any> {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+  if (!GEMINI_API_KEY) {
+    throw new Error('Chave do Gemini não configurada localmente ou na Vercel.');
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  
+  const payload = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: 'application/pdf',
+              data: base64
+            }
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      responseMimeType: "application/json"
+    }
+  };
+
+  const response = await axios.post(url, payload, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 25000
+  });
+
+  const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(jsonStr);
 }
 
 export async function extrairContrachequeDoBase64(base64: string, mimeType: string): Promise<any> {
