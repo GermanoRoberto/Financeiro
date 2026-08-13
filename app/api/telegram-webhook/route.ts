@@ -997,7 +997,14 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
         alertaMelhora = `Identifiquei uma queda de ${red}% nos gastos variáveis na última semana e o saldo livre aumentou. A situação começou a demonstrar os primeiros sinais reais de melhora.`;
       }
 
-      const pedirEstudo = textoUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("estudo de caminho");
+      const textCleanCheck = textoUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const pedirEstudo = textCleanCheck.includes("estudo de caminho") || 
+                           textCleanCheck.includes("estudo financeiro") || 
+                           textCleanCheck.includes("analise financeira") || 
+                           textCleanCheck.includes("reestruturacao") ||
+                           textCleanCheck.includes("caminho financeiro") ||
+                           textCleanCheck.includes("recuperacao financeira") ||
+                           textCleanCheck.includes("reestruturar");
 
       contextoFinanceiro = `
 DADOS FINANCEIROS REAIS DO HUMANO (Use isso para fazer contas ou responder perguntas sobre dinheiro/empréstimos):
