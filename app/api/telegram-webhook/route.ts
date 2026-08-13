@@ -1169,7 +1169,7 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
   const modelCandidates = [
     process.env.GROQ_TEXT_MODEL,
     'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant'
+    'openai/gpt-oss-20b'
   ].filter(Boolean) as string[];
 
   let lastChatError: any = null;
