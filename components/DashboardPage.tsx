@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Usuario, Contracheque, Desconto, Divida, GastoDiario } from '@/lib/types';
 import { logout } from '@/lib/auth';
@@ -35,6 +35,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   const [carregando, setCarregando] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'contracheque' | 'dividas' | 'telegram' | 'emprestimos' | 'relatorio'>('dashboard');
   const [contrachequesExpandidos, setContrachequesExpandidos] = useState<Record<string, boolean>>({});
+  const [verTodasTransacoes, setVerTodasTransacoes] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -135,6 +136,24 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     if (visao === 'casal') return true;
     return g.usuario_id === usuarioAtivo.id;
   });
+
+  const gastosExibidos = useMemo(() => {
+    if (verTodasTransacoes) return gastosFiltrados;
+
+    if (visao === 'casal') {
+      const ultimosVoce = _gastos.filter(g => g.usuario_id === usuario.id).slice(0, 3);
+      const ultimosEsposa = usuarioEsposa 
+        ? _gastos.filter(g => g.usuario_id === usuarioEsposa.id).slice(0, 3) 
+        : [];
+      return [...ultimosVoce, ...ultimosEsposa].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    } else if (visao === 'voce') {
+      return _gastos.filter(g => g.usuario_id === usuario.id).slice(0, 3);
+    } else {
+      return usuarioEsposa 
+        ? _gastos.filter(g => g.usuario_id === usuarioEsposa.id).slice(0, 3) 
+        : [];
+    }
+  }, [_gastos, gastosFiltrados, visao, verTodasTransacoes, usuario.id, usuarioEsposa]);
 
   const totalDescontos = descontosAtivos.reduce((acc, d) => acc + (d.valor || 0), 0);
   const comprometimento = calcularComprometimento(totalDescontos, salarioBruto);
@@ -334,10 +353,13 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
               {/* Estudo de Recuperação (Cenários e Alertas) */}
               <EstudoRecuperacao
-                transacoes={gastosFiltrados}
-                salarioLiquido={salarioLiquido}
-                totalDescontos={totalDescontos}
-                dividasAtivas={dividasAtivas}
+                transacoes={_gastos}
+                contracheques={contracheques}
+                descontos={descontos}
+                dividas={dividas}
+                usuario={usuario}
+                usuarioEsposa={usuarioEsposa}
+                visao={visao}
               />
 
               {/* Tabela de Prospecção */}
@@ -371,7 +393,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-white/5 text-sm">
-                            {gastosFiltrados.map((g) => {
+                            {gastosExibidos.map((g) => {
                               const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
                               const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
                               
@@ -453,7 +475,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
                       {/* Visualização de Cards para Mobile */}
                       <div className="block sm:hidden space-y-4">
-                        {gastosFiltrados.map((g) => {
+                        {gastosExibidos.map((g) => {
                           const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
                           const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
                           
@@ -536,6 +558,16 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                             </div>
                           );
                         })}
+                      </div>
+
+                      {/* Botão de Expansão */}
+                      <div className="mt-6 flex justify-center border-t border-white/5 pt-4">
+                        <button
+                          onClick={() => setVerTodasTransacoes(!verTodasTransacoes)}
+                          className="px-6 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white transition-all active:scale-[0.98] flex items-center gap-2"
+                        >
+                          {verTodasTransacoes ? '👁️ Mostrar apenas últimos gastos (3 de cada)' : '👁️ Ver Todas as Transações'}
+                        </button>
                       </div>
                     </>
                   )}
