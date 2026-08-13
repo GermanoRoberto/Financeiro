@@ -16,6 +16,7 @@ import VincularTelegram from '@/components/VincularTelegram';
 import CadastroTransacao from '@/components/CadastroTransacao';
 import PainelEmprestimos from '@/components/PainelEmprestimos';
 import RelatorioMensal from '@/components/RelatorioMensal';
+import EstudoRecuperacao from '@/components/EstudoRecuperacao';
 import toast from 'react-hot-toast';
 
 type Visao = 'casal' | 'voce' | 'esposa';
@@ -330,6 +331,14 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
 
               {/* Seção de Gráficos */}
               <GraficosFinanceiros projecao={projecao} />
+
+              {/* Estudo de Recuperação (Cenários e Alertas) */}
+              <EstudoRecuperacao
+                transacoes={gastosFiltrados}
+                salarioLiquido={salarioLiquido}
+                totalDescontos={totalDescontos}
+                dividasAtivas={dividasAtivas}
+              />
 
               {/* Tabela de Prospecção */}
               <TabMeses projecao={projecao} />

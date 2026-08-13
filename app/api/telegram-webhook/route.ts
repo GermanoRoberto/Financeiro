@@ -929,6 +929,76 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
 
       const totalGastos = (gastosMes || []).reduce((acc, g) => acc + g.valor, 0);
 
+      // --- CALCULOS PARA ESTUDO DE CAMINHO ---
+      const totalDividasMensal = (divList || []).reduce((acc, d) => acc + (d.ativa ? d.valor_parcela : 0), 0);
+      let totalDescontosVal = 0;
+      if (cc) {
+        const { data: list } = await supabase
+          .from('descontos')
+          .select('valor')
+          .eq('contracheque_id', cc.id);
+        if (list) {
+          totalDescontosVal = list.reduce((acc, d) => acc + d.valor, 0);
+        }
+      }
+      
+      const fixas = totalDescontosVal + totalDividasMensal;
+      const receita = cc?.salario_liquido || 4500;
+
+      // Buscar despesas variáveis nos últimos 30 dias
+      const hoje = new Date();
+      const trintaDiasAtras = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const trintaDiasAtrasStr = trintaDiasAtras.toISOString().substring(0, 10);
+      const { data: listGastos } = await supabase
+        .from('gastos_diarios')
+        .select('valor, categoria, data')
+        .eq('usuario_id', usuario.id)
+        .gte('data', trintaDiasAtrasStr);
+
+      const variaveis = (listGastos || [])
+        .filter(g => g.categoria !== 'receita_extra' && g.categoria !== 'transferencia')
+        .reduce((acc, g) => acc + g.valor, 0) || 1800;
+
+      const sobraA = receita - fixas - (variaveis * 0.85);
+      const diasA = sobraA > 0 ? Math.ceil(1500 / sobraA) * 30 : 180;
+
+      const maiorDivida = (divList || []).reduce((max, d) => d.valor_parcela > max ? d.valor_parcela : max, 0);
+      let sB = -2500;
+      let mesB = -1;
+      for (let m = 1; m <= 12; m++) {
+        let sobraB = receita - fixas - variaveis;
+        if (m >= 3 && maiorDivida > 0) {
+          sobraB += maiorDivida;
+        }
+        sB += sobraB;
+        if (sB >= 0 && mesB === -1) {
+          mesB = m;
+        }
+      }
+      const diasB = mesB > 0 ? mesB : 12;
+
+      // Alertas de melhora
+      const seteDiasAtras = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const seteDiasAtrasStr = seteDiasAtras.toISOString().substring(0, 10);
+      const quatorzeDiasAtras = new Date(hoje.getTime() - 14 * 24 * 60 * 60 * 1000);
+      const quatorzeDiasAtrasStr = quatorzeDiasAtras.toISOString().substring(0, 10);
+
+      const despesasSemana1 = (listGastos || [])
+        .filter(g => g.categoria !== 'receita_extra' && g.categoria !== 'transferencia' && g.data >= seteDiasAtrasStr)
+        .reduce((acc, g) => acc + g.valor, 0);
+
+      const despesasSemana2 = (listGastos || [])
+        .filter(g => g.categoria !== 'receita_extra' && g.categoria !== 'transferencia' && g.data >= quatorzeDiasAtrasStr && g.data < seteDiasAtrasStr)
+        .reduce((acc, g) => acc + g.valor, 0);
+
+      let alertaMelhora = 'Nenhum sinal claro de melhora ainda. Mantenha os cortes!';
+      if (despesasSemana1 < despesasSemana2 && despesasSemana2 > 0) {
+        const red = Math.round(((despesasSemana2 - despesasSemana1) / despesasSemana2) * 100);
+        alertaMelhora = `Identifiquei uma queda de ${red}% nos gastos variáveis na última semana e o saldo livre aumentou. A situação começou a demonstrar os primeiros sinais reais de melhora.`;
+      }
+
+      const pedirEstudo = textoUsuario.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes("estudo de caminho");
+
       contextoFinanceiro = `
 DADOS FINANCEIROS REAIS DO HUMANO (Use isso para fazer contas ou responder perguntas sobre dinheiro/empréstimos):
 - Dono ativo: ${usuario.nome}
@@ -940,6 +1010,21 @@ ${descontosTexto}
 ${dividasTexto}
 - Gastos variáveis lançados em conta este mês: R$ ${totalGastos}
 `;
+
+      if (pedirEstudo) {
+        contextoFinanceiro += `
+⚠️ ATENÇÃO: O USUÁRIO SOLICITOU ESPECIFICAMENTE UM "ESTUDO DE CAMINHO"!
+Siga RIGOROSAMENTE estas diretrizes de formatação:
+1. Sem introduções ou explicações teóricas. Vá direto ao assunto.
+2. Formato cirúrgico: Use marcadores (bullets) curtos para os planos de ação.
+3. Apresente os dois cenários projetados com base nos dados reais calculados:
+   - **Cenário A (Foco em Sobrevivência)**: Corte imediato de 15% nas despesas variáveis (redução de R$ ${(variaveis * 0.15).toFixed(2)}/mês). Nova sobra mensal estimada: R$ ${sobraA.toFixed(2)}. O saldo sairá do vermelho em até ${diasA} dias.
+   - **Cenário B (Foco em Renegociação)**: Manter gastos variáveis atuais, mas amortizar/suspender a maior parcela de dívida ativa (R$ ${maiorDivida.toFixed(2)}/mês) a partir do Mês 3. Sobra mensal pós Mês 3: R$ ${(receita - (fixas - maiorDivida) - variaveis).toFixed(2)}. O saldo sairá do vermelho no ${diasB}º mês.
+4. Finalize com a seção "🌱 Alerta de Melhora Indicado pela IA" contendo o seguinte alerta do rastreador:
+   - "${alertaMelhora}"
+5. Mantenha a persona sarcástica e ácida da Azula, mas cumpra essa formatação à risca!
+`;
+      }
     } catch (e: any) {
       console.error('Erro ao montar contexto financeiro:', e.message);
     }
