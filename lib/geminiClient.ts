@@ -85,11 +85,11 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
 
   const isImage = mimeType.startsWith('image/');
   
-  // Lista de candidatos de modelos de imagem (Visão/OCR)
+  // Lista de candidatos de modelos de imagem (Visão/OCR da Groq)
   const visionCandidates = [
     process.env.GROQ_VISION_MODEL,
-    'qwen/qwen3.6-27b',
-    'meta-llama/llama-4-scout-17b-16e-instruct'
+    'llama-3.2-11b-vision-preview',
+    'llama-3.2-90b-vision-preview'
   ].filter(Boolean) as string[];
 
   // Lista de candidatos de modelos de texto
