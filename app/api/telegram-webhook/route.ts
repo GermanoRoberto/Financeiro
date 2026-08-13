@@ -54,13 +54,58 @@ function setSessionState(chatId: number, state: any): void {
   } catch (e) {}
 }
 
+function escaparHTMLTelegram(texto: string): string {
+  // 1. Escapar ampersands comerciais que não sejam de entidades HTML válidas
+  let temp = texto.replace(/&(?!(amp|lt|gt);)/g, '&amp;');
+
+  // 2. Mapear e proteger tags permitidas
+  const placeholders: { [key: string]: string } = {
+    '<b>': '___B_OPEN___',
+    '</b>': '___B_CLOSE___',
+    '<code>': '___CODE_OPEN___',
+    '</code>': '___CODE_CLOSE___',
+    '<i>': '___I_OPEN___',
+    '</i>': '___I_CLOSE___',
+    '<strong>': '___STRONG_OPEN___',
+    '</strong>': '___STRONG_CLOSE___',
+    '<em>': '___EM_OPEN___',
+    '</em>': '___EM_CLOSE___'
+  };
+
+  for (const tag of Object.keys(placeholders)) {
+    const regex = new RegExp(tag, 'gi');
+    temp = temp.replace(regex, placeholders[tag]);
+  }
+
+  // 3. Escapar outros caracteres de tag (< e >)
+  temp = temp.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // 4. Restaurar as tags protegidas
+  for (const tag of Object.keys(placeholders)) {
+    const regex = new RegExp(placeholders[tag], 'g');
+    temp = temp.replace(regex, tag);
+  }
+
+  return temp;
+}
+
 async function enviarMensagem(chatId: number, texto: string) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  await axios.post(url, {
-    chat_id: chatId,
-    text: texto,
-    parse_mode: 'HTML',
-  });
+  const textoTratado = escaparHTMLTelegram(texto);
+  try {
+    await axios.post(url, {
+      chat_id: chatId,
+      text: textoTratado,
+      parse_mode: 'HTML',
+    });
+  } catch (err: any) {
+    console.error('Erro ao enviar mensagem em HTML. Tentando texto puro...', err.message);
+    const textoPuro = texto.replace(/<[^>]*>/g, '');
+    await axios.post(url, {
+      chat_id: chatId,
+      text: textoPuro,
+    });
+  }
 }
 
 async function responderCallback(callbackQueryId: string, texto?: string) {
@@ -73,24 +118,48 @@ async function responderCallback(callbackQueryId: string, texto?: string) {
 
 async function editarMensagem(chatId: number, messageId: number, texto: string) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`;
-  await axios.post(url, {
-    chat_id: chatId,
-    message_id: messageId,
-    text: texto,
-    parse_mode: 'HTML',
-  });
+  const textoTratado = escaparHTMLTelegram(texto);
+  try {
+    await axios.post(url, {
+      chat_id: chatId,
+      message_id: messageId,
+      text: textoTratado,
+      parse_mode: 'HTML',
+    });
+  } catch (err: any) {
+    console.error('Erro ao editar mensagem em HTML. Tentando texto puro...', err.message);
+    const textoPuro = texto.replace(/<[^>]*>/g, '');
+    await axios.post(url, {
+      chat_id: chatId,
+      message_id: messageId,
+      text: textoPuro,
+    });
+  }
 }
 
 async function enviarMensagemComBotoes(chatId: number, texto: string, botoes: any) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  await axios.post(url, {
-    chat_id: chatId,
-    text: texto,
-    parse_mode: 'HTML',
-    reply_markup: {
-      inline_keyboard: botoes
-    }
-  });
+  const textoTratado = escaparHTMLTelegram(texto);
+  try {
+    await axios.post(url, {
+      chat_id: chatId,
+      text: textoTratado,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: botoes
+      }
+    });
+  } catch (err: any) {
+    console.error('Erro ao enviar mensagem com botões em HTML. Tentando texto puro...', err.message);
+    const textoPuro = texto.replace(/<[^>]*>/g, '');
+    await axios.post(url, {
+      chat_id: chatId,
+      text: textoPuro,
+      reply_markup: {
+        inline_keyboard: botoes
+      }
+    });
+  }
 }
 
 const botoesCategorias = (gastoId: string) => [
