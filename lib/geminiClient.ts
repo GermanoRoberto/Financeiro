@@ -235,6 +235,39 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     }
   }
 
+  // Se for um arquivo de texto plano (.txt, .ofx, .csv, .html, etc.)
+  let isPlainTxt = mimeType.startsWith('text/') || 
+                   mimeType === 'application/x-ofx' || 
+                   mimeType === 'application/xml' || 
+                   mimeType === 'application/json';
+
+  // Se o tipo for genérico (octet-stream), inspecionamos os primeiros bytes para ver se é texto plano
+  if (!isPlainTxt && mimeType === 'application/octet-stream') {
+    try {
+      const buffer = Buffer.from(base64, 'base64');
+      const sample = buffer.slice(0, 500).toString('utf8');
+      if (!sample.includes('\x00')) {
+        isPlainTxt = true;
+      }
+    } catch (e) {}
+  }
+
+  if (isPlainTxt && !isTextOnly) {
+    try {
+      console.log('Decodificando arquivo de texto plano...');
+      const buffer = Buffer.from(base64, 'base64');
+      const textContent = buffer.toString('utf8');
+      
+      base64OrText = textContent;
+      mimeTypeFinal = 'text/plain';
+      isTextOnly = true;
+      promptFinal = `${prompt}\n\n[Conteúdo do arquivo]:\n${base64OrText}`;
+      console.log(`Arquivo de texto decodificado com sucesso (${base64OrText.length} caracteres).`);
+    } catch (txtError: any) {
+      console.error(`Erro ao decodificar arquivo de texto: ${txtError.message}`);
+    }
+  }
+
   // REGRA LOCAL (Sem Dependência de IA): Verifica se o PDF bate com padrões conhecidos
   if (isTextOnly && extractedPdfText) {
     try {
