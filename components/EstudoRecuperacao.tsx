@@ -17,12 +17,12 @@ interface EstudoRecuperacaoProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-950/95 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-2xl text-white font-sans text-xs">
+      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xl text-slate-800 font-sans text-xs">
         <p className="font-bold text-slate-400 mb-2 uppercase tracking-wider">{label}</p>
         <div className="space-y-1.5">
           {payload.map((p: any, idx: number) => (
             <div key={idx} className="flex items-center gap-4 justify-between">
-              <span className="flex items-center gap-1.5 text-slate-300">
+              <span className="flex items-center gap-1.5 text-slate-600">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.stroke }} />
                 {p.name}:
               </span>
@@ -179,27 +179,27 @@ export default function EstudoRecuperacao({
   }
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md space-y-6 shadow-2xl">
+    <div className="bg-white border border-slate-100 rounded-3xl p-6 space-y-6 shadow-md">
       
       {/* Cabeçalho */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <span>📈</span> Cenários e Projeção (Estudo de Caminho)
           </h3>
-          <p className="text-xs text-slate-400 font-medium mt-1">
+          <p className="text-xs text-slate-500 font-medium mt-1">
             Análise preditiva cruzando receitas, despesas fixas e despesas variáveis reais.
           </p>
         </div>
 
         {/* Seleção de Aba Interna */}
-        <div className="flex bg-slate-950/40 p-1 rounded-2xl border border-white/5 self-start gap-1">
+        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 self-start gap-1">
           <button
             onClick={() => setAbaInterna('casal')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               abaInterna === 'casal'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
+                : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             👥 Casal
@@ -208,8 +208,8 @@ export default function EstudoRecuperacao({
             onClick={() => setAbaInterna('voce')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               abaInterna === 'voce'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
+                : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             🙋‍♂️ Você
@@ -219,8 +219,8 @@ export default function EstudoRecuperacao({
               onClick={() => setAbaInterna('esposa')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 abaInterna === 'esposa'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               🙋‍♀️ {usuarioEsposa.nome.split(' ')[0]}
@@ -233,37 +233,37 @@ export default function EstudoRecuperacao({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Cenário A */}
-        <div className="bg-blue-950/30 border border-blue-500/20 p-5 rounded-2xl space-y-3">
+        <div className="bg-blue-50/50 border border-blue-100 p-5 rounded-2xl space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-blue-400 text-sm flex items-center gap-1.5">
+            <h4 className="font-bold text-blue-600 text-sm flex items-center gap-1.5">
               <span>🛡️</span> Cenário A (Foco em Sobrevivência)
             </h4>
-            <span className="text-[10px] bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded-full font-bold uppercase">
+            <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold uppercase">
               Corte de 15%
             </span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Reduzir despesas variáveis em **15%** (Economia mensal de **R$ {Math.round(despesasVariaveis * 0.15).toLocaleString('pt-BR')}**).
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Reduzir despesas variáveis em <strong>15%</strong> (Economia mensal de <strong>R$ {Math.round(despesasVariaveis * 0.15).toLocaleString('pt-BR')}</strong>).
           </p>
-          <div className="text-xs font-bold text-slate-400">
+          <div className="text-xs font-bold text-slate-500">
             Impacto: {mesViradaA > 0 ? `Sairá do vermelho em até ${mesViradaA * 30} dias.` : 'Tendência de melhora gradual.'}
           </div>
         </div>
 
         {/* Cenário B */}
-        <div className="bg-amber-950/30 border border-amber-500/20 p-5 rounded-2xl space-y-3">
+        <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-2xl space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-amber-400 text-sm flex items-center gap-1.5">
+            <h4 className="font-bold text-amber-600 text-sm flex items-center gap-1.5">
               <span>🤝</span> Cenário B (Foco em Renegociação)
             </h4>
-            <span className="text-[10px] bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase">
+            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase">
               Alívio de Parcela
             </span>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Renegociar ou amortizar a maior parcela ativa deste perfil (economia mensal de **R$ {Math.round(maiorDivida).toLocaleString('pt-BR')}** a partir do Mês 3).
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Renegociar ou amortizar a maior parcela ativa deste perfil (economia mensal de <strong>R$ {Math.round(maiorDivida).toLocaleString('pt-BR')}</strong> a partir do Mês 3).
           </p>
-          <div className="text-xs font-bold text-slate-400">
+          <div className="text-xs font-bold text-slate-500">
             Impacto: {mesViradaB > 0 ? `Sairá do vermelho no ${mesViradaB}º mês.` : 'Estabilização progressiva.'}
           </div>
         </div>
@@ -271,19 +271,19 @@ export default function EstudoRecuperacao({
       </div>
 
       {/* Gráfico de Projeção */}
-      <div className="bg-slate-950/35 border border-white/5 p-5 rounded-2xl">
-        <h4 className="font-bold text-white text-xs mb-4 uppercase tracking-wider text-slate-400">
+      <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl">
+        <h4 className="font-bold text-slate-500 text-xs mb-4 uppercase tracking-wider">
           Projeção do Saldo Acumulado ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Seu perfil' : `Perfil da ${usuarioEsposa?.nome.split(' ')[0]}`})
         </h4>
         <div className="h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={dadosGrafico} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="mes" stroke="#94a3b8" fontSize={11} />
-              <YAxis stroke="#94a3b8" fontSize={11} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
+              <XAxis dataKey="mes" stroke="#64748b" fontSize={11} />
+              <YAxis stroke="#64748b" fontSize={11} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-              <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+              <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" />
               <Line
                 type="monotone"
                 dataKey="Cenário A (Corte)"
@@ -306,14 +306,14 @@ export default function EstudoRecuperacao({
       </div>
 
       {/* Rastreador de Alertas */}
-      <div className="bg-emerald-950/20 border border-emerald-500/20 p-5 rounded-2xl space-y-3">
-        <h4 className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
+      <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl space-y-3 shadow-sm">
+        <h4 className="font-bold text-emerald-600 text-sm flex items-center gap-1.5">
           <span>🔔</span> Alertas do Rastreador de Recuperação ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Você' : usuarioEsposa?.nome.split(' ')[0]})
         </h4>
         <ul className="space-y-2">
           {alertas.map((alerta, idx) => (
-            <li key={idx} className="text-xs text-slate-300 flex items-start gap-2">
-              <span className="text-emerald-400 mt-0.5">🌱</span>
+            <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
+              <span className="text-emerald-500 mt-0.5">🌱</span>
               <span>{alerta}</span>
             </li>
           ))}
