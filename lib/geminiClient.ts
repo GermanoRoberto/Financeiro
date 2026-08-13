@@ -268,14 +268,39 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     }
   }
 
-  // REGRA LOCAL (Sem Dependência de IA): Verifica se o PDF bate com padrões conhecidos
-  if (isTextOnly && extractedPdfText) {
+  // REGRA LOCAL (Sem Dependência de IA): Verifica se o texto bate com padrões conhecidos
+  const textToParse = extractedPdfText || (isTextOnly ? base64OrText : '');
+  if (isTextOnly && textToParse) {
     try {
-      // 1. Fatura Vivo
-      if (extractedPdfText.includes('Sua Fatura Digital Vivo') || (extractedPdfText.includes('Resumo de fatura') && extractedPdfText.includes('Valor da fatura'))) {
+      // 1. Arquivos OFX (Qualquer banco que exporte OFX)
+      if (textToParse.includes('<OFX>') || textToParse.includes('<STMTTRN>')) {
+        console.log('Detectado arquivo OFX! Processando localmente sem IA...');
+        const transacoes = parseOfxLocal(textToParse);
+        if (transacoes && transacoes.length > 0) {
+          return {
+            tipo_documento: 'extrato_bancario',
+            transacoes: transacoes
+          };
+        }
+      }
+
+      // 2. Extrato da Caixa em formato TXT/Texto
+      if (textToParse.includes('CAIXA') && (textToParse.includes('Extrato por período') || textToParse.includes('Lançamentos'))) {
+        console.log('Detectado Extrato Caixa em Texto! Processando localmente sem IA...');
+        const transacoes = parseCaixaTxtLocal(textToParse);
+        if (transacoes && transacoes.length > 0) {
+          return {
+            tipo_documento: 'extrato_bancario',
+            transacoes: transacoes
+          };
+        }
+      }
+
+      // 3. Fatura Vivo
+      if (textToParse.includes('Sua Fatura Digital Vivo') || (textToParse.includes('Resumo de fatura') && textToParse.includes('Valor da fatura'))) {
         console.log('Detectada Fatura Vivo! Processando localmente sem IA...');
-        const matchValor = extractedPdfText.match(/Valor da fatura:\s*R\$\s*([\d,.]+)/i);
-        const matchVencimento = extractedPdfText.match(/Data de vencimento:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+        const matchValor = textToParse.match(/Valor da fatura:\s*R\$\s*([\d,.]+)/i);
+        const matchVencimento = textToParse.match(/Data de vencimento:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
         
         if (matchValor && matchVencimento) {
           const valor = parseFloat(matchValor[1].replace(/\./g, '').replace(',', '.'));
@@ -290,10 +315,10 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
         }
       }
 
-      // 2. Extrato Nubank (Germano ou Priscila)
-      if (extractedPdfText.includes('Saldo final do período') && (extractedPdfText.includes('Germano Roberto do Carmo') || extractedPdfText.includes('Priscila Aparecida da Silva')) && extractedPdfText.includes('VALORES EM R$')) {
+      // 4. Extrato Nubank (Germano ou Priscila)
+      if (textToParse.includes('Saldo final do período') && (textToParse.includes('Germano Roberto do Carmo') || textToParse.includes('Priscila Aparecida da Silva')) && textToParse.includes('VALORES EM R$')) {
         console.log('Detectado Extrato Nubank! Processando localmente sem IA...');
-        const transacoes = parseNubankLocal(extractedPdfText);
+        const transacoes = parseNubankLocal(textToParse);
         if (transacoes && transacoes.length > 0) {
           return {
             tipo_documento: 'extrato_bancario',
@@ -449,6 +474,100 @@ function parseNubankLocal(text: string): any[] {
     }
   }
 
+  return transactions;
+}
+
+function parseOfxLocal(text: string): any[] {
+  const transactions: any[] = [];
+  const blocks = text.split(/<STMTTRN>/i);
+  for (let i = 1; i < blocks.length; i++) {
+    const block = blocks[i].split(/<\/STMTTRN>/i)[0];
+    const amtMatch = block.match(/<TRNAMT>\s*(-?[\d\.]+)/i);
+    const nameMatch = block.match(/<NAME>\s*(.*?)(?=\r?\n|<|$)/i);
+    const memoMatch = block.match(/<MEMO>\s*(.*?)(?=\r?\n|<|$)/i);
+    const dateMatch = block.match(/<DTPOSTED>\s*(\d{8})/i);
+
+    if (amtMatch && (nameMatch || memoMatch) && dateMatch) {
+      const valor = Math.abs(parseFloat(amtMatch[1]));
+      let desc = (memoMatch ? memoMatch[1] : nameMatch![1]).trim();
+      const dateStr = dateMatch[1];
+      const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+      
+      desc = desc
+        .replace(/^-/, '')
+        .replace(/-\s*•••\..*$/, '')
+        .replace(/via\s*Open Banking/gi, '')
+        .trim();
+
+      let categoria = 'outros';
+      const valorOriginal = parseFloat(amtMatch[1]);
+      const isCredito = valorOriginal > 0;
+
+      if (isCredito) {
+        categoria = 'receita_extra';
+      } else if (desc.toLowerCase().includes('uber') || desc.toLowerCase().includes('99')) {
+        categoria = 'transporte';
+      } else if (desc.toLowerCase().includes('spotify') || desc.toLowerCase().includes('netflix')) {
+        categoria = 'diversão';
+      }
+
+      transactions.push({
+        data: formattedDate,
+        valor: valor,
+        estabelecimento: desc || 'Estabelecimento',
+        categoria: categoria
+      });
+    }
+  }
+  return transactions;
+}
+
+function parseCaixaTxtLocal(text: string): any[] {
+  const transactions: any[] = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  for (const line of lines) {
+    const match = line.match(/^(\d{2})\/(\d{2})\/(\d{4})\b/);
+    if (match) {
+      const day = match[1];
+      const month = match[2];
+      const year = match[3];
+      const formattedDate = `${year}-${month}-${day}`;
+
+      const valMatch = line.match(/([\d\.]+,\d{2})\s*([DC])\b/i);
+      if (valMatch) {
+        const valStr = valMatch[1].replace(/\./g, '').replace(',', '.');
+        const valor = parseFloat(valStr);
+        const tipo = valMatch[2].toUpperCase();
+
+        let clean = line
+          .replace(/^\d{2}\/\d{2}\/\d{4}\s*(-\s*\d{2}:\d{2}:\d{2})?/, '')
+          .replace(/^\s*\d{6}\s*/, '')
+          .replace(/[\d\.]+,\d{2}\s*[DC].*$/, '')
+          .trim();
+
+        if (clean.toUpperCase().includes('SALDO DIA')) {
+          continue;
+        }
+
+        let categoria = 'outros';
+        if (tipo === 'C') {
+          categoria = 'receita_extra';
+        } else if (clean.toLowerCase().includes('uber') || clean.toLowerCase().includes('99')) {
+          categoria = 'transporte';
+        } else if (clean.toLowerCase().includes('spotify') || clean.toLowerCase().includes('netflix')) {
+          categoria = 'diversão';
+        }
+
+        transactions.push({
+          data: formattedDate,
+          valor: valor,
+          estabelecimento: clean || 'Caixa',
+          categoria: categoria
+        });
+      }
+    }
+  }
   return transactions;
 }
 
