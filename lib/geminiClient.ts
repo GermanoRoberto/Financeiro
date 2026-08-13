@@ -342,8 +342,8 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
         }
       }
 
-      // 2. Extrato Nubank de Germano
-      if (extractedPdfText.includes('Saldo final do período') && extractedPdfText.includes('Germano Roberto do Carmo') && extractedPdfText.includes('VALORES EM R$')) {
+      // 2. Extrato Nubank (Germano ou Priscila)
+      if (extractedPdfText.includes('Saldo final do período') && (extractedPdfText.includes('Germano Roberto do Carmo') || extractedPdfText.includes('Priscila Aparecida da Silva')) && extractedPdfText.includes('VALORES EM R$')) {
         console.log('Detectado Extrato Nubank! Processando localmente sem IA...');
         const transacoes = parseNubankLocal(extractedPdfText);
         if (transacoes && transacoes.length > 0) {
@@ -445,7 +445,8 @@ function parseNubankLocal(text: string): any[] {
             .replace(/Transferência enviada/gi, '')
             .trim();
 
-          const matchVal = cleanLine.match(/^(.*?)([\d\.]+,?\d{2})$/);
+          // Regex atualizada para exigir vírgula antes dos centavos para evitar casar com CNPJs
+          const matchVal = cleanLine.match(/^(.*?)([\d\.]+(,\d{2}))$/);
           if (matchVal) {
             estabelecimento = matchVal[1].trim();
             const valStr = matchVal[2].replace(/\./g, '').replace(',', '.');
@@ -458,6 +459,33 @@ function parseNubankLocal(text: string): any[] {
               .trim();
               
             if (!estabelecimento) estabelecimento = 'Estabelecimento';
+          } else {
+            // Se a linha não casar com valor porque o valor quebrou para a linha seguinte
+            // (Ex: o CNPJ ficou na linha atual e o valor ficou na próxima linha)
+            // Vamos verificar as próximas 3 linhas para encontrar o valor correto
+            for (let k = 1; k <= 3; k++) {
+              const nextLine = lines[j + k];
+              if (nextLine && nextLine.match(/^\s*([\d\.]+,?\d{2})\s*$/)) {
+                const nextValMatch = nextLine.match(/^\s*([\d\.]+,?\d{2})\s*$/);
+                if (nextValMatch) {
+                  const valStr = nextValMatch[1].replace(/\./g, '').replace(',', '.');
+                  valor = parseFloat(valStr);
+                  
+                  // Limpa a descrição da linha atual
+                  let desc = cleanLine
+                    .replace(/^-/, '')
+                    .replace(/-\s*•••\..*$/, '')
+                    .replace(/via\s*Open Banking/gi, '')
+                    .trim();
+                  
+                  // Remove pedaços de CNPJ que sobraram no fim do nome
+                  desc = desc.replace(/\s*-\s*\d{2}\.\d{3}\.\d{3}$/, '').trim();
+                  
+                  estabelecimento = desc || 'Estabelecimento';
+                  break;
+                }
+              }
+            }
           }
         }
 
