@@ -1184,7 +1184,7 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
-          max_tokens: 350
+          max_tokens: 1500
         },
         {
           headers: {
