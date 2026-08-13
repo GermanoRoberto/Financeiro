@@ -355,51 +355,121 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                       Nenhuma transação registrada para esta visão.
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                            <th className="pb-3 pr-4">Descrição / Estabelecimento</th>
-                            <th className="pb-3 pr-4">Categoria</th>
-                            <th className="pb-3 pr-4">Valor</th>
-                            <th className="pb-3 pr-4">Data</th>
-                            <th className="pb-3 pr-4">Quem gastou</th>
-                            <th className="pb-3 pr-4">Status</th>
-                            <th className="pb-3 text-center">Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5 text-sm">
-                          {gastosFiltrados.map((g) => {
-                            const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
-                            const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-                            
-                            const isReceita = g.categoria === 'receita_extra';
-                            const isTransf = g.categoria === 'transferencia';
+                    <>
+                      {/* Visualização de Tabela para Desktop */}
+                      <div className="hidden sm:block overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                              <th className="pb-3 pr-4">Descrição / Estabelecimento</th>
+                              <th className="pb-3 pr-4">Categoria</th>
+                              <th className="pb-3 pr-4">Valor</th>
+                              <th className="pb-3 pr-4">Data</th>
+                              <th className="pb-3 pr-4">Quem gastou</th>
+                              <th className="pb-3 pr-4">Status</th>
+                              <th className="pb-3 text-center">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5 text-sm">
+                            {gastosFiltrados.map((g) => {
+                              const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
+                              const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                              
+                              const isReceita = g.categoria === 'receita_extra';
+                              const isTransf = g.categoria === 'transferencia';
 
-                            return (
-                              <tr key={g.id} className="hover:bg-white/5 transition-colors">
-                                <td className="py-3.5 pr-4 font-semibold text-white capitalize">{g.estabelecimento || 'Não identificado'}</td>
-                                <td className="py-3.5 pr-4 text-slate-300">
-                                  <select
-                                    value={g.categoria || 'outros'}
-                                    onChange={(e) => alterarCategoriaGasto(g.id, e.target.value)}
-                                    className="bg-slate-900/90 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer font-medium"
-                                  >
-                                    <option value="alimentação" className="bg-slate-950">🍔 Alimentação</option>
-                                    <option value="transporte" className="bg-slate-950">🚗 Transporte</option>
-                                    <option value="saúde" className="bg-slate-950">💊 Saúde</option>
-                                    <option value="diversão" className="bg-slate-950">🎮 Diversão</option>
-                                    <option value="moradia" className="bg-slate-950">🏠 Moradia</option>
-                                    <option value="educação" className="bg-slate-950">🎓 Educação</option>
-                                    <option value="compras" className="bg-slate-950">🛍️ Compras</option>
-                                    <option value="serviços" className="bg-slate-950">🛠️ Serviços/Assinaturas</option>
-                                    <option value="investimentos" className="bg-slate-950">📈 Investimentos</option>
-                                    <option value="receita_extra" className="bg-slate-950">💰 Receita Extra</option>
-                                    <option value="transferencia" className="bg-slate-950">🔄 Transferência</option>
-                                    <option value="outros" className="bg-slate-950">📦 Outros</option>
-                                  </select>
-                                </td>
-                                <td className={`py-3.5 pr-4 font-bold ${
+                              return (
+                                <tr key={g.id} className="hover:bg-white/5 transition-colors">
+                                  <td className="py-3.5 pr-4 font-semibold text-white capitalize">{g.estabelecimento || 'Não identificado'}</td>
+                                  <td className="py-3.5 pr-4 text-slate-300">
+                                    <select
+                                      value={g.categoria || 'outros'}
+                                      onChange={(e) => alterarCategoriaGasto(g.id, e.target.value)}
+                                      className="bg-slate-900/90 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer font-medium"
+                                    >
+                                      <option value="alimentação" className="bg-slate-950">🍔 Alimentação</option>
+                                      <option value="transporte" className="bg-slate-950">🚗 Transporte</option>
+                                      <option value="saúde" className="bg-slate-950">💊 Saúde</option>
+                                      <option value="diversão" className="bg-slate-950">🎮 Diversão</option>
+                                      <option value="moradia" className="bg-slate-950">🏠 Moradia</option>
+                                      <option value="educação" className="bg-slate-950">🎓 Educação</option>
+                                      <option value="compras" className="bg-slate-950">🛍️ Compras</option>
+                                      <option value="serviços" className="bg-slate-950">🛠️ Serviços/Assinaturas</option>
+                                      <option value="investimentos" className="bg-slate-950">📈 Investimentos</option>
+                                      <option value="receita_extra" className="bg-slate-950">💰 Receita Extra</option>
+                                      <option value="transferencia" className="bg-slate-950">🔄 Transferência</option>
+                                      <option value="outros" className="bg-slate-950">📦 Outros</option>
+                                    </select>
+                                  </td>
+                                  <td className={`py-3.5 pr-4 font-bold ${
+                                    isReceita 
+                                      ? 'text-emerald-400' 
+                                      : isTransf 
+                                        ? 'text-purple-400' 
+                                        : 'text-rose-400'
+                                  }`}>
+                                    {isReceita ? '+ ' : ''}R$ {g.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-3.5 pr-4 text-slate-300">{dataFormatada}</td>
+                                  <td className="py-3.5 pr-4">
+                                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                                      g.usuario_id === usuario.id 
+                                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                        : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
+                                    }`}>
+                                      {dono}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 pr-4">
+                                    {g.confirmado ? (
+                                      <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        Confirmado
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => confirmarGasto(g.id)}
+                                        className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors"
+                                        title="Clique para Confirmar"
+                                      >
+                                        Pendente (Confirmar)
+                                      </button>
+                                    )}
+                                  </td>
+                                  <td className="py-3.5 text-center">
+                                    <button
+                                      onClick={() => excluirGasto(g.id)}
+                                      className="p-1.5 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
+                                      title="Excluir Lançamento"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Visualização de Cards para Mobile */}
+                      <div className="block sm:hidden space-y-4">
+                        {gastosFiltrados.map((g) => {
+                          const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
+                          const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                          
+                          const isReceita = g.categoria === 'receita_extra';
+                          const isTransf = g.categoria === 'transferencia';
+
+                          return (
+                            <div key={g.id} className="bg-slate-900/40 border border-white/10 rounded-2xl p-4 space-y-3">
+                              <div className="flex justify-between items-start gap-2">
+                                <div>
+                                  <h4 className="font-semibold text-white capitalize text-sm truncate max-w-[170px]" title={g.estabelecimento || ''}>
+                                    {g.estabelecimento || 'Não identificado'}
+                                  </h4>
+                                  <span className="text-[10px] text-slate-400">{dataFormatada}</span>
+                                </div>
+                                <span className={`text-sm font-bold ${
                                   isReceita 
                                     ? 'text-emerald-400' 
                                     : isTransf 
@@ -407,47 +477,67 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                       : 'text-rose-400'
                                 }`}>
                                   {isReceita ? '+ ' : ''}R$ {g.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </td>
-                                <td className="py-3.5 pr-4 text-slate-300">{dataFormatada}</td>
-                                <td className="py-3.5 pr-4">
-                                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                                <div className="flex items-center gap-1.5">
+                                  <select
+                                    value={g.categoria || 'outros'}
+                                    onChange={(e) => alterarCategoriaGasto(g.id, e.target.value)}
+                                    className="bg-slate-950 border border-white/10 rounded-xl px-1.5 py-1 text-[10px] text-slate-300 focus:outline-none cursor-pointer font-medium"
+                                  >
+                                    <option value="alimentação">🍔 Alimentação</option>
+                                    <option value="transporte">🚗 Transporte</option>
+                                    <option value="saúde">💊 Saúde</option>
+                                    <option value="diversão">🎮 Diversão</option>
+                                    <option value="moradia">🏠 Moradia</option>
+                                    <option value="educação">🎓 Educação</option>
+                                    <option value="compras">🛍️ Compras</option>
+                                    <option value="serviços">🛠️ Assinaturas</option>
+                                    <option value="investimentos">📈 Investimentos</option>
+                                    <option value="receita_extra">💰 Receita</option>
+                                    <option value="transferencia">🔄 Transf.</option>
+                                    <option value="outros">📦 Outros</option>
+                                  </select>
+
+                                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${
                                     g.usuario_id === usuario.id 
                                       ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
                                       : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
                                   }`}>
                                     {dono}
                                   </span>
-                                </td>
-                                <td className="py-3.5 pr-4">
-                                  {g.confirmado ? (
-                                    <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                      Confirmado
-                                    </span>
-                                  ) : (
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {!g.confirmado && (
                                     <button
                                       onClick={() => confirmarGasto(g.id)}
-                                      className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors"
-                                      title="Clique para Confirmar"
+                                      className="text-[10px] px-2 py-1 rounded-lg font-semibold bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 active:scale-95 transition-all"
                                     >
-                                      Pendente (Confirmar)
+                                      Confirmar
                                     </button>
                                   )}
-                                </td>
-                                <td className="py-3.5 text-center">
+                                  {g.confirmado && (
+                                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                      OK
+                                    </span>
+                                  )}
                                   <button
                                     onClick={() => excluirGasto(g.id)}
-                                    className="p-1.5 text-slate-400 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
+                                    className="p-1 text-slate-400 hover:text-red-400 transition-colors"
                                     title="Excluir Lançamento"
                                   >
                                     🗑️
                                   </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </div>
                 <div className="lg:col-span-1">
