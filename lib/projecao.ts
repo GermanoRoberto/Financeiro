@@ -87,9 +87,13 @@ export function projetarDescontos(
     });
 
     // 3. Filtrar dívidas da tabela (manuais ativas + consignadas inativas) válidas para este mês
+    // e reduzir a quantidade de parcelas restantes conforme os meses passam
     const dividasDoMes = dividas.filter((d) => {
       return d.parcelas_restantes > i;
-    });
+    }).map((d) => ({
+      ...d,
+      parcelas_restantes: d.parcelas_restantes - i
+    }));
 
     const totalDescontos = descontosDoMes.reduce((acc, d) => acc + (d.valor || 0), 0);
     const totalDividasTabela = dividasDoMes.reduce((acc, d) => acc + (d.valor_parcela || 0), 0);
@@ -97,17 +101,23 @@ export function projetarDescontos(
     const totalDividas = totalDividasTabela + totalDividasHolerite;
 
     // Criar representações virtuais para empréstimos em folha não detalhados (ex: Priscila)
-    const dividasVirtuais: Divida[] = descontosEmprestimoComoDivida.map((d) => ({
-      id: d.id,
-      usuario_id: (d as any).contracheque?.usuario_id || null,
-      credor: `Consignado em Folha: ${d.tipo}`,
-      valor_total: d.valor,
-      valor_parcela: d.valor,
-      parcelas_restantes: 12,
-      vencimento_dia: 10,
-      ativa: false,
-      criado_em: d.criado_em,
-    }));
+    // Reduzindo as parcelas restantes virtuais também
+    const dividasVirtuais: Divida[] = descontosEmprestimoComoDivida.map((d) => {
+      const totalPart = d.parcela_total || 12;
+      const atualPart = d.parcela_atual || 1;
+      const restantesHoje = Math.max(0, totalPart - atualPart + 1);
+      return {
+        id: d.id,
+        usuario_id: (d as any).contracheque?.usuario_id || null,
+        credor: `Consignado em Folha: ${d.tipo}`,
+        valor_total: d.valor * restantesHoje,
+        valor_parcela: d.valor,
+        parcelas_restantes: Math.max(0, restantesHoje - i),
+        vencimento_dia: 10,
+        ativa: false,
+        criado_em: d.criado_em,
+      };
+    });
 
     meses.push({
       mes,

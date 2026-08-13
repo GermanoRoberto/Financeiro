@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { ProjecaoMes } from '@/lib/projecao';
 
 interface TabMesesProps {
@@ -7,6 +8,9 @@ interface TabMesesProps {
 }
 
 export default function TabMeses({ projecao }: TabMesesProps) {
+  const [expandido, setExpandido] = useState(false);
+  const dadosExibidos = expandido ? projecao : projecao.slice(0, 2);
+
   return (
     <div className="bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md overflow-hidden shadow-2xl">
       <div className="px-6 py-5 border-b border-white/10 flex justify-between items-center bg-slate-950/20">
@@ -33,7 +37,7 @@ export default function TabMeses({ projecao }: TabMesesProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 text-slate-200">
-            {projecao.map((mes, idx) => {
+            {dadosExibidos.map((mes, idx) => {
               const mesNome = mes.mesFormatado.charAt(0).toUpperCase() + mes.mesFormatado.slice(1);
               return (
                 <tr key={idx} className="hover:bg-white/5 transition-colors group">
@@ -60,7 +64,7 @@ export default function TabMeses({ projecao }: TabMesesProps) {
 
       {/* Lista de Cards para Mobile */}
       <div className="block sm:hidden divide-y divide-white/5">
-        {projecao.map((mes, idx) => {
+        {dadosExibidos.map((mes, idx) => {
           const mesNome = mes.mesFormatado.charAt(0).toUpperCase() + mes.mesFormatado.slice(1);
           return (
             <div key={idx} className="p-5 space-y-2 bg-slate-900/10">
@@ -94,6 +98,18 @@ export default function TabMeses({ projecao }: TabMesesProps) {
           );
         })}
       </div>
+
+      {/* Botão de Expansão/Colapso para Projeção Completa */}
+      {projecao.length > 2 && (
+        <div className="p-4 border-t border-white/10 flex justify-center bg-slate-950/20">
+          <button
+            onClick={() => setExpandido(!expandido)}
+            className="px-6 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white transition-all active:scale-[0.98] flex items-center gap-2"
+          >
+            {expandido ? '👁️ Ocultar Planejamento de Longo Prazo' : '👁️ Ver Projeção Completa (Próximos 12 Meses)'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

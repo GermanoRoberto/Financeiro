@@ -139,7 +139,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   const totalDescontos = descontosAtivos.reduce((acc, d) => acc + (d.valor || 0), 0);
   const comprometimento = calcularComprometimento(totalDescontos, salarioBruto);
 
-  const projecao = projetarDescontos(descontosAtivos, dividasAtivas, salarioBruto, 12);
+  const projecao = projetarDescontos(descontosAtivos, dividasAba, salarioBruto, 12);
 
   const handleLogout = async () => {
     await logout();
