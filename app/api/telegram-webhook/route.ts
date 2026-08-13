@@ -883,6 +883,16 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
 
   let contextoFinanceiro = '';
 
+  const formatarRealLocal = (valor: number): string => {
+    const isNegativo = valor < 0;
+    const valorAbsoluto = Math.abs(valor);
+    const partes = valorAbsoluto.toFixed(2).split('.');
+    let inteira = partes[0];
+    const decimal = partes[1];
+    inteira = inteira.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return `${isNegativo ? '-' : ''}${inteira},${decimal}`;
+  };
+
   if (usuario) {
     try {
       // 1. Buscar contracheque mais recente
@@ -1021,35 +1031,35 @@ ${dividasTexto}
       if (pedirEstudo) {
         contextoFinanceiro += `
 ⚠️ ATENÇÃO: O USUÁRIO SOLICITOU UM ESTUDO FINANCEIRO / DE CAMINHO.
-Você deve responder usando RIGOROSAMENTE este formato estruturado e visual, substituindo os valores reais que calculamos para você:
+Você deve responder usando RIGOROSAMENTE este formato estruturado e visual com tags HTML, pois o canal do Telegram utiliza parse_mode: 'HTML':
 
 === TEMPLATE DE RESPOSTA ===
-😺 **AZULA | ESTUDO DE CAMINHO FINANCEIRO** 🐾
+😺 <b>AZULA | ESTUDO DE CAMINHO FINANCEIRO</b> 🐾
 
 Humano, fiz as contas. Aqui está o seu raio-x financeiro atual e as duas alternativas mais viáveis:
 
-💰 **RAIO-X MENSAL ATUAL**
-*   **Receita Líquida:** \`R$ ${(receita).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
-*   **Despesas Fixas + Descontos:** \`R$ ${(fixas).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
-*   **Despesas Variáveis (Média):** \`R$ ${(variaveis).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
-*   **Saldo Livre:** \`${(receita - fixas - variaveis >= 0 ? '🟢 SOBRA' : '🔴 DÉFICIT')} R$ ${(receita - fixas - variaveis).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
+💰 <b>RAIO-X MENSAL ATUAL</b>
+•   <b>Receita Líquida:</b> <code>R$ ${formatarRealLocal(receita)}</code>
+•   <b>Despesas Fixas + Descontos:</b> <code>R$ ${formatarRealLocal(fixas)}</code>
+•   <b>Despesas Variáveis (Média):</b> <code>R$ ${formatarRealLocal(variaveis)}</code>
+•   <b>Saldo Livre:</b> <code>${receita - fixas - variaveis >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(receita - fixas - variaveis)}</code> (${receita - fixas - variaveis >= 0 ? 'Sobra' : 'Déficit'})
 
 ---
 
-⚡ **CENÁRIO A | Sobrevivência (Corte de 15%)**
-*   **Ação:** Reduzir gastos variáveis em **15%** (Economia de \`R$ ${(variaveis * 0.15).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\` por mês).
-*   **Novo Saldo Livre:** \`R$ ${(sobraA).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`
-*   **Tempo de Recuperação:** \`Saldo fora do vermelho em ${diasA} dias\`.
+⚡ <b>CENÁRIO A | Sobrevivência (Corte de 15%)</b>
+•   <b>Ação:</b> Reduzir gastos variáveis em <b>15%</b> (Economia de <code>R$ ${formatarRealLocal(variaveis * 0.15)}</code> por mês).
+•   <b>Novo Saldo Livre:</b> <code>${sobraA >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(sobraA)}</code> (${sobraA >= 0 ? 'Sobra' : 'Déficit'})
+•   <b>Tempo de Recuperação:</b> <code>Saldo fora do vermelho em ${diasA} dias</code>.
 
-🤝 **CENÁRIO B | Renegociação (Foco em Dívidas)**
-*   **Ação:** Renegociar/suspender a maior parcela de dívida ativa (\`R$ ${(maiorDivida).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`/mês) a partir do Mês 3.
-*   **Novo Saldo Livre (Mês 3+):** \`R$ ${(receita - (fixas - maiorDivida) - variaveis).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`.
-*   **Tempo de Recuperação:** \`Saldo fora do vermelho no ${diasB}º mês\`.
+🤝 <b>CENÁRIO B | Renegociação (Foco em Dívidas)</b>
+•   <b>Ação:</b> Renegociar/suspender a maior parcela de dívida ativa (<code>R$ ${formatarRealLocal(maiorDivida)}</code>/mês) a partir do Mês 3.
+•   <b>Novo Saldo Livre (Mês 3+):</b> <code>${(receita - (fixas - maiorDivida) - variaveis) >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(receita - (fixas - maiorDivida) - variaveis)}</code> (${(receita - (fixas - maiorDivida) - variaveis) >= 0 ? 'Sobra' : 'Déficit'}).
+•   <b>Tempo de Recuperação:</b> <code>Saldo fora do vermelho no ${diasB}º mês</code>.
 
 ---
 
-🌱 **RASTREADOR DE RECUPERAÇÃO**
-*   *${alertaMelhora}*
+🌱 <b>RASTREADOR DE RECUPERAÇÃO</b>
+•   <i>${alertaMelhora}</i>
 === FIM DO TEMPLATE ===
 
 Importante:
@@ -1079,7 +1089,7 @@ REGRAS CRÍTICAS DE CONDUTA (EVITE REPETIÇÃO ROBÓTICA!):
 4. Ao se referir à esposa do usuário (Priscila), chame-a ocasionalmente de "Velha" ou "a Velha".
 5. Se te perguntarem se vale a pena fazer empréstimo, renegociar dívidas ou esticar parcelas, use os dados reais abaixo para fazer contas rápidas. Dê sermão debochado ("humano tonto"), mas dê uma resposta financeira real, precisa e matematicamente inteligente!
 6. Responda em português brasileiro.
-7. FORMATAÇÃO FINANCEIRA FÁCIL PARA A VELHA (PRISCILA): Nunca junte cálculos, listas ou dados financeiros em um único parágrafo corrido de texto. Sempre organize em blocos limpos, usando tópicos (bullets), negritos, e quebras de linha claras. Use crases (\`) para destacar valores numéricos (ex: \`R$ 1.500,00\`), facilitando muito a leitura visual.
+7. FORMATAÇÃO FINANCEIRA FÁCIL PARA A VELHA (PRISCILA): Nunca junte cálculos, listas ou dados financeiros em um único parágrafo corrido de texto. Sempre organize em blocos limpos, usando tópicos (bullets •), negritos simples e quebras de linha claras. Como as mensagens são enviadas para o Telegram com parse_mode HTML, você DEVE usar as tags <b> para negrito (ex: <b>Receita:</b>) e <code> para valores numéricos (ex: <code>R$ 1.500,00</code>). NUNCA use asteriscos (**) ou acentos graves (\`) para formatação, pois eles não são aceitos no canal do Telegram e poluem a mensagem de asteriscos.
 
 ${contextoFinanceiro}
 
