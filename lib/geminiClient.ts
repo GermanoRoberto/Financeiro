@@ -195,7 +195,14 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
               }
             );
             const textContentRetry = responseRetry.data.choices?.[0]?.message?.content || '';
-            const jsonStrRetry = textContentRetry.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            const inicioRetry = textContentRetry.indexOf('{');
+            const fimRetry = textContentRetry.lastIndexOf('}');
+            let jsonStrRetry = textContentRetry;
+            if (inicioRetry !== -1 && fimRetry !== -1 && fimRetry > inicioRetry) {
+              jsonStrRetry = textContentRetry.substring(inicioRetry, fimRetry + 1);
+            } else {
+              jsonStrRetry = textContentRetry.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            }
             return JSON.parse(jsonStrRetry);
           } catch (retryErr: any) {
             err = retryErr;
