@@ -152,7 +152,14 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
       );
 
       const textContent = response.data.choices?.[0]?.message?.content || '';
-      const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const inicio = textContent.indexOf('{');
+      const fim = textContent.lastIndexOf('}');
+      let jsonStr = textContent;
+      if (inicio !== -1 && fim !== -1 && fim > inicio) {
+        jsonStr = textContent.substring(inicio, fim + 1);
+      } else {
+        jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      }
       return JSON.parse(jsonStr);
     } catch (err: any) {
       const status = err.response?.status;
@@ -609,7 +616,14 @@ async function extrairComGeminiPDF(base64: string, prompt: string): Promise<any>
   });
 
   const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const inicio = textContent.indexOf('{');
+  const fim = textContent.lastIndexOf('}');
+  let jsonStr = textContent;
+  if (inicio !== -1 && fim !== -1 && fim > inicio) {
+    jsonStr = textContent.substring(inicio, fim + 1);
+  } else {
+    jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  }
   return JSON.parse(jsonStr);
 }
 
