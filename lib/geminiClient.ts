@@ -160,7 +160,11 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
       } else {
         jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       }
-      return JSON.parse(jsonStr);
+      try {
+        return JSON.parse(jsonStr);
+      } catch (parseErr: any) {
+        throw new Error(`Falha ao decodificar JSON (Modelo: ${model}, Resposta: "${jsonStr.substring(0, 120)}..."): ${parseErr.message}`);
+      }
     } catch (err: any) {
       const status = err.response?.status;
       const errMsg = err.response?.data?.error?.message || err.message;
@@ -203,7 +207,11 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
             } else {
               jsonStrRetry = textContentRetry.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
             }
-            return JSON.parse(jsonStrRetry);
+            try {
+              return JSON.parse(jsonStrRetry);
+            } catch (parseErr: any) {
+              throw new Error(`Falha ao decodificar JSON no Retry (Modelo: ${model}, Resposta: "${jsonStrRetry.substring(0, 120)}..."): ${parseErr.message}`);
+            }
           } catch (retryErr: any) {
             err = retryErr;
           }
@@ -631,7 +639,11 @@ async function extrairComGeminiPDF(base64: string, prompt: string): Promise<any>
   } else {
     jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   }
-  return JSON.parse(jsonStr);
+  try {
+    return JSON.parse(jsonStr);
+  } catch (parseErr: any) {
+    throw new Error(`Falha ao decodificar JSON no Gemini (Resposta: "${jsonStr.substring(0, 120)}..."): ${parseErr.message}`);
+  }
 }
 
 export async function extrairContrachequeDoBase64(base64: string, mimeType: string): Promise<any> {
