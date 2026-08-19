@@ -96,7 +96,7 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   const textCandidates = [
     process.env.GROQ_TEXT_MODEL,
     'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant'
+    'openai/gpt-oss-20b'
   ].filter(Boolean) as string[];
 
   const candidates = isImage && !isTextOnly ? visionCandidates : textCandidates;
