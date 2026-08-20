@@ -96,11 +96,14 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   const textCandidates = [
     process.env.GROQ_TEXT_MODEL,
     'llama-3.3-70b-versatile',
-    'openai/gpt-oss-20b'
-  ].filter(Boolean) as string[];
+    'llama-3.2-3b-preview',
+    'llama-3.2-1b-preview',
+    'llama-3.2-11b-vision-preview'
+  ].filter(Boolean)
+   .filter(model => model !== 'llama-3.1-8b-instant') as string[];
 
   const candidates = isImage && !isTextOnly ? visionCandidates : textCandidates;
-  let lastError: any = null;
+  const errorsList: string[] = [];
 
   for (const model of candidates) {
     let payload: any = null;
@@ -218,62 +221,13 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
         }
       }
 
-      console.warn(`Falha na chamada com o modelo Groq ${model}: ${err.response?.data?.error?.message || err.message}. Tentando próximo candidato...`);
-      lastError = err;
+      const finalErrMsg = err.response?.data?.error?.message || err.message;
+      console.warn(`Falha na chamada com o modelo Groq ${model}: ${finalErrMsg}. Tentando próximo candidato...`);
+      errorsList.push(`${model}: ${finalErrMsg}`);
     }
   }
 
-  throw lastError || new Error('Nenhum modelo da Groq conseguiu processar a requisição.');
-}
-
-async function extrairComGemini(base64OrText: string, mimeType: string, prompt: string, isTextOnly: boolean): Promise<any> {
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-  if (!GEMINI_API_KEY) {
-    throw new Error('Chave do Gemini não configurada.');
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-  
-  const parts: any[] = [];
-  if (isTextOnly) {
-    parts.push({ text: prompt });
-  } else {
-    parts.push({ text: prompt });
-    parts.push({
-      inlineData: {
-        mimeType: mimeType,
-        data: base64OrText
-      }
-    });
-  }
-
-  const payload = {
-    contents: [{ parts }],
-    generationConfig: {
-      responseMimeType: "application/json"
-    }
-  };
-
-  const response = await axios.post(url, payload, {
-    headers: { 'Content-Type': 'application/json' },
-    timeout: 25000
-  });
-
-  const textContent = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const inicio = textContent.indexOf('{');
-  const fim = textContent.lastIndexOf('}');
-  let jsonStr = textContent;
-  if (inicio !== -1 && fim !== -1 && fim > inicio) {
-    jsonStr = textContent.substring(inicio, fim + 1);
-  } else {
-    jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  }
-  
-  try {
-    return JSON.parse(jsonStr);
-  } catch (parseErr: any) {
-    throw new Error(`Falha ao decodificar JSON no Gemini (Resposta: "${jsonStr.substring(0, 120)}..."): ${parseErr.message}`);
-  }
+  throw new Error(`A extração de dados falhou em todos os candidatos do Groq:\n` + errorsList.join('\n'));
 }
 
 export async function extrairComFallback(base64: string, mimeType: string, prompt: string): Promise<any> {
@@ -408,29 +362,8 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
     }
   }
 
-  const errors: string[] = [];
-
-  // Tenta extrair com Groq
-  try {
-    console.log('Iniciando extração via Groq...');
-    return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
-  } catch (groqError: any) {
-    const groqMsg = groqError.response?.data?.error?.message || groqError.message;
-    console.warn(`Falha na extração com Groq: ${groqMsg}. Acionando fallback do Gemini...`);
-    errors.push(`Groq: ${groqMsg}`);
-  }
-
-  // Fallback para Gemini
-  try {
-    console.log('Iniciando extração via Gemini...');
-    return await extrairComGemini(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
-  } catch (geminiError: any) {
-    const geminiMsg = geminiError.response?.data?.error?.message || geminiError.message;
-    console.error(`Falha na extração com Gemini: ${geminiMsg}`);
-    errors.push(`Gemini: ${geminiMsg}`);
-  }
-
-  throw new Error(`A extração de dados falhou em todos os provedores:\n` + errors.join('\n'));
+  console.log('Iniciando extração via Groq...');
+  return await extrairComGroq(base64OrText, mimeTypeFinal, promptFinal, isTextOnly);
 }
 
 function parseNubankLocal(text: string): any[] {
