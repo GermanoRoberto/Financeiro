@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseClient';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const supabase = supabaseServer();
     // Faz um select simples limitado a 1 registro na tabela de contracheques para manter o banco ativo
-    const { data, error } = await supabase.from('contracheques').select('id').limit(1);
+    const { error } = await supabase.from('contracheques').select('id').limit(1);
     
     if (error) {
       console.error('Erro no ping do Supabase:', error.message);
