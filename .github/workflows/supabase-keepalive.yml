@@ -1,0 +1,33 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Executa todos os dias às 05:00 e 17:00 UTC (02:00 e 14:00 no Brasil)
+    - cron: '0 5,17 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API (usuarios_permitidos)
+        run: |
+          curl -s -f -X GET 'https://klaqsahqeiesgjcdjjap.supabase.co/rest/v1/usuarios_permitidos?select=id&limit=1' \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXFzYWhxZWllc2dqY2RqamFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODExMzksImV4cCI6MjA5OTI1NzEzOX0.dvFM5uctoLCF98buoeEodHpc_FvW7yUq1w1i8gurzYA" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXFzYWhxZWllc2dqY2RqamFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODExMzksImV4cCI6MjA5OTI1NzEzOX0.dvFM5uctoLCF98buoeEodHpc_FvW7yUq1w1i8gurzYA" > /dev/null
+          echo "Supabase usuarios_permitidos ping successful!"
+
+      - name: Ping Supabase REST API (contracheques)
+        run: |
+          curl -s -f -X GET 'https://klaqsahqeiesgjcdjjap.supabase.co/rest/v1/contracheques?select=id&limit=1' \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXFzYWhxZWllc2dqY2RqamFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODExMzksImV4cCI6MjA5OTI1NzEzOX0.dvFM5uctoLCF98buoeEodHpc_FvW7yUq1w1i8gurzYA" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXFzYWhxZWllc2dqY2RqamFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODExMzksImV4cCI6MjA5OTI1NzEzOX0.dvFM5uctoLCF98buoeEodHpc_FvW7yUq1w1i8gurzYA" > /dev/null
+          echo "Supabase contracheques ping successful!"
+
+      - name: Ping Supabase REST API (gastos_diarios)
+        run: |
+          curl -s -f -X GET 'https://klaqsahqeiesgjcdjjap.supabase.co/rest/v1/gastos_diarios?select=id&limit=1' \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXFzYWhxZWllc2dqY2RqamFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODExMzksImV4cCI6MjA5OTI1NzEzOX0.dvFM5uctoLCF98buoeEodHpc_FvW7yUq1w1i8gurzYA" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsYXFzYWhxZWllc2dqY2RqamFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODExMzksImV4cCI6MjA5OTI1NzEzOX0.dvFM5uctoLCF98buoeEodHpc_FvW7yUq1w1i8gurzYA" > /dev/null
+          echo "Supabase gastos_diarios ping successful!"
