@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseClient';
 import axios from 'axios';
 import { extrairComFallback } from '@/lib/geminiClient';
-import { dispararFofocaSemanal } from '@/lib/fofoca';
+import { dispararFofocaSemanal, limparTextoAzula } from '@/lib/fofoca';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
@@ -1308,8 +1308,8 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
 
   const modelCandidates = [
     process.env.GROQ_TEXT_MODEL,
-    'qwen/qwen3.6-27b',
     'meta-llama/llama-4-scout-17b-16e-instruct',
+    'qwen/qwen3.6-27b',
     'openai/gpt-oss-120b',
     'openai/gpt-oss-20b',
     'qwen/qwen3.8-27b'
@@ -1323,13 +1323,17 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
       const payload: any = {
         model: model,
         messages: [
+          {
+            role: 'system',
+            content: 'Você é a Azula, a gata de estimação debochada, ácida, possessiva e engraçada de Germano e Priscila. Você fala em português brasileiro. NUNCA gere introduções, explicações ou pensamentos em inglês como "Here is a thinking process".'
+          },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
         max_tokens: 1500
       };
 
-      if (model.includes('gpt-oss')) {
+      if (model.includes('gpt-oss') || model.includes('qwen')) {
         payload.reasoning_format = 'hidden';
       }
 
@@ -1346,8 +1350,8 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
       );
 
       let content = response.data.choices?.[0]?.message?.content || '';
-      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-      return content || '😼 Bué!';
+      content = limparTextoAzula(content);
+      if (content) return content;
     } catch (error: any) {
       console.warn(`Falha na conversa com o modelo Groq ${model}: ${error.message}. Tentando próximo candidato...`);
       lastChatError = error;
