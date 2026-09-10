@@ -79,28 +79,76 @@ Formato do JSON de retorno esperado:
 
 function parseJSONSeguro(texto: string, model: string): any {
   let cleaned = texto.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  const inicio = cleaned.indexOf('{');
-  const fim = cleaned.lastIndexOf('}');
-  let jsonStr = cleaned;
-  if (inicio !== -1 && fim !== -1 && fim > inicio) {
-    jsonStr = cleaned.substring(inicio, fim + 1);
-  } else {
-    jsonStr = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const firstOpen = cleaned.indexOf('{');
+  if (firstOpen === -1) {
+    throw new Error(`Nenhum objeto JSON encontrado na resposta do modelo ${model}. Resposta: "${cleaned.substring(0, 150)}..."`);
+  }
+  let s = cleaned.substring(firstOpen);
+
+  // 1. Tentar parse direto
+  try {
+    return JSON.parse(s);
+  } catch (e) {}
+
+  // 2. Tentar remover vírgulas sobressalentes
+  try {
+    const semVirgula = s.replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(semVirgula);
+  } catch (e) {}
+
+  // 3. Tentar corrigir se o modelo ecoou os tipos do schema (ex: "valor": number, "categoria": string)
+  try {
+    const corrigidoTipos = s
+      .replace(/:\s*number\b/gi, ': 0')
+      .replace(/:\s*string\b/gi, ': ""')
+      .replace(/:\s*boolean\b/gi, ': false')
+      .replace(/:\s*null\b/gi, ': null')
+      .replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(corrigidoTipos);
+  } catch (e) {}
+
+  // 4. Truncamento no meio de arrays/objetos (ex: extratos bancários longos cortados no limite de tokens)
+  // Caminha de trás para frente procurando o último item completo fechado com '}'
+  let lastClose = s.lastIndexOf('}');
+  while (lastClose > 0) {
+    let candidate = s.substring(0, lastClose + 1).replace(/,\s*$/, '');
+    
+    // Contar chaves e colchetes abertos para balancear e fechar a estrutura
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    for (let i = 0; i < candidate.length; i++) {
+      const c = candidate[i];
+      if (c === '"' && candidate[i - 1] !== '\\') inString = !inString;
+      if (!inString) {
+        if (c === '{') openBraces++;
+        else if (c === '}') openBraces--;
+        else if (c === '[') openBrackets++;
+        else if (c === ']') openBrackets--;
+      }
+    }
+
+    let closer = candidate;
+    for (let b = 0; b < openBrackets; b++) closer += ']';
+    for (let b = 0; b < openBraces; b++) closer += '}';
+
+    try {
+      return JSON.parse(closer);
+    } catch (e) {
+      try {
+        const closerLimpo = closer
+          .replace(/:\s*number\b/gi, ': 0')
+          .replace(/:\s*string\b/gi, ': ""')
+          .replace(/:\s*boolean\b/gi, ': false')
+          .replace(/,\s*([}\]])/g, '$1');
+        return JSON.parse(closerLimpo);
+      } catch (e2) {}
+    }
+
+    lastClose = s.lastIndexOf('}', lastClose - 1);
   }
 
-  try {
-    return JSON.parse(jsonStr);
-  } catch (e1: any) {
-    try {
-      // Remove trailing commas antes de fechamento de chaves ou colchetes e caracteres de controle
-      const sanitized = jsonStr
-        .replace(/,\s*}/g, '}')
-        .replace(/,\s*]/g, ']');
-      return JSON.parse(sanitized);
-    } catch (e2: any) {
-      throw new Error(`Falha ao decodificar JSON (Modelo: ${model}, Resposta: "${jsonStr.substring(0, 150)}..."): ${e1.message}`);
-    }
-  }
+  throw new Error(`Falha ao decodificar JSON (Modelo: ${model}, Resposta: "${cleaned.substring(0, 150)}...")`);
 }
 
 async function extrairComGroq(base64: string, mimeType: string, prompt: string, isTextOnly: boolean): Promise<any> {
@@ -115,16 +163,17 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   const visionCandidates = [
     process.env.GROQ_VISION_MODEL,
     'qwen/qwen3.6-27b',
-    'qwen/qwen3.8-27b',
-    'meta-llama/llama-4-scout-17b-16e-instruct'
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'qwen/qwen3.8-27b'
   ].filter(Boolean) as string[];
 
   // Lista de candidatos de modelos de texto (Modelos ativos após a depreciação de agosto/2026)
   const textCandidates = [
     process.env.GROQ_TEXT_MODEL,
+    'qwen/qwen3.6-27b',
+    'meta-llama/llama-4-scout-17b-16e-instruct',
     'openai/gpt-oss-120b',
     'openai/gpt-oss-20b',
-    'qwen/qwen3.6-27b',
     'qwen/qwen3.8-27b'
   ].filter(Boolean) as string[];
 

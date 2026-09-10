@@ -515,23 +515,60 @@ async function processarArquivoTelegram(chatId: number, message: any) {
     const prompt = `Analise este documento/imagem e classifique-o em "contracheque", "comprovante_gasto", "contratos_emprestimo" ou "extrato_bancario".
 Extraia as informações e responda APENAS com um objeto JSON válido, sem markdown (sem \`\`\`json) ou textos adicionais.
 
-Formato esperado:
+FORMATOS DE RESPOSTA JSON ESPERADOS (Use valores reais extraídos do documento, NUNCA use palavras como "number" ou "string" nos valores):
 
 Se for "contracheque":
 {
   "tipo_documento": "contracheque",
-  "nome_funcionario": string|null (Nome completo do funcionário/trabalhador no cabeçalho do documento, ex: "GERMANO ROBERTO DE LIMA BARRETO"),
-  "is_adiantamento": boolean (true se for um demonstrativo de Adiantamento Quinzenal / vale, senão false. Dica: Se o título for 'Adiantamento Quinzenal' ou se os Proventos forem iguais ao Líquido e houver poucos ou nenhum desconto, marque true),
-  "salario_bruto": number (Identifique o valor total de PROVENTOS/GANHOS, também chamado de 'Total de Proventos' ou 'Total de Vencimentos', antes de qualquer desconto. ATENÇÃO: NÃO confunda o salário bruto com o Salário Base. O salário bruto é a soma total de Proventos no rodapé, ex: 3907.89),
-  "salario_liquido": number (Identifique o valor líquido recebido, também chamado de 'Valor líquido' ou 'Líquido a receber' no rodapé. ATENÇÃO: O valor líquido do mensal é ex: 920.00, do adiantamento é ex: 993.00. NÃO confunda 'Descontos' ou 'Total de Descontos' como 2987.89 com o valor líquido!),
-  "mes_referencia": "YYYY-MM" (Mês e ano do contracheque, ex: "2026-06"),
+  "nome_funcionario": "NOME DO FUNCIONARIO",
+  "is_adiantamento": false,
+  "salario_bruto": 3907.89,
+  "salario_liquido": 920.00,
+  "mes_referencia": "2026-06",
   "descontos": [
     {
-      "tipo": string (Descrição/Nome do desconto exatamente como consta escrito no contracheque, ex: "FPM (FOLHA)", "IRRF", "EMPRÉSTIMO CEF", "INSS", "COPARTICIPAÇÃO PLASC"). ATENÇÃO: Extraia TODOS os descontos do documento. No contracheque da Prefeitura de Juiz de Fora, a rubrica "FPM (FOLHA)" ou "FPM" é a previdência municipal dos servidores, que é um DESCONTO obrigatório e deve ser extraído exatamente com o nome "FPM (FOLHA)"!),
-      "valor": number (Valor absoluto do desconto como número decimal. ATENÇÃO: Cada linha de evento segue o formato [Código] [Descrição] [Índice/Referência] [Proventos] [Descontos]. O campo Índice/Referência (ex: 14,0000 ou 30,00) NÃO é um valor financeiro de desconto, ignore-o! Extraia apenas valores da coluna real de Descontos, ex: 925.40),
-      "parcela_atual": number|null (Se for parcelado/empréstimo, ex: 2 no "02/12"),
-      "parcela_total": number|null (Total de parcelas, ex: 12 no "02/12"),
-      "recorrente": boolean (true se for mensal recorrente como INSS, FPM, Plano de Saúde, senão false)
+      "tipo": "INSS",
+      "valor": 308.58,
+      "parcela_atual": null,
+      "parcela_total": null,
+      "recorrente": true
+    }
+  ]
+}
+
+Se for "comprovante_gasto":
+{
+  "tipo_documento": "comprovante_gasto",
+  "valor": 85.00,
+  "estabelecimento": "Vivo",
+  "categoria": "moradia",
+  "data": "2026-07-21"
+}
+
+Se for "contratos_emprestimo":
+{
+  "tipo_documento": "contratos_emprestimo",
+  "contratos": [
+    {
+      "numero_contrato": "123456",
+      "credor": "Consignado Privado CLT",
+      "valor_total": 5000.00,
+      "valor_parcela": 250.00,
+      "parcela_atual": 2,
+      "parcela_total": 12
+    }
+  ]
+}
+
+Se for "extrato_bancario":
+{
+  "tipo_documento": "extrato_bancario",
+  "transacoes": [
+    {
+      "valor": 27.00,
+      "estabelecimento": "Nome da pessoa ou empresa",
+      "categoria": "outros",
+      "data": "2026-07-01"
     }
   ]
 }
@@ -550,50 +587,10 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
      Exemplo real extraído do texto:
      * "56 FPM (FOLHA) 14,0000 925,40" -> O valor do desconto é R$ 925,40.
 2. O salario_bruto (Total de Proventos) deve ser exatamente igual à soma dos proventos individuais do documento.
-3. A soma dos descontos individuais na lista "descontos" deve ser exatamente igual ao total de descontos do documento (ex: 3814.14 ou 2987.89).
+3. A soma dos descontos individuais na lista "descontos" deve ser exatamente igual ao total de descontos do documento.
 4. O salario_liquido deve ser exatamente igual a (salario_bruto - soma de todos os descontos).
-Use essas regras matemáticas para validar os números extraídos. Se faltar algum valor na lista de descontos para fechar a conta do líquido, encontre qual linha de desconto foi omitida e adicione-a à lista.
-
-Se for "comprovante_gasto":
-{
-  "tipo_documento": "comprovante_gasto",
-  "valor": number (Valor total pago/transferido ou valor total da fatura/boleto a pagar),
-  "estabelecimento": string (Nome da empresa emissora da fatura, mercado, loja, credor ou recebedor, ex: "Vivo", "Coelba", "Uber"),
-  "categoria": string ("alimentação"|"transporte"|"saúde"|"diversão"|"moradia"|"educação"|"compras"|"serviços"|"investimentos"|"receita_extra"|"transferencia"|"outros"),
-  "data": "YYYY-MM-DD" (Data do gasto ou data de vencimento da fatura/cobrança)
-}
-
-Se for "contratos_emprestimo":
-{
-  "tipo_documento": "contratos_emprestimo",
-  "contratos": [
-    {
-      "numero_contrato": string (Número identificador do contrato),
-      "credor": string (ex: "Consignado Privado CLT"),
-      "valor_total": number (Valor original ou saldo total do empréstimo),
-      "valor_parcela": number (Valor de cada parcela mensal),
-      "parcela_atual": number (Número da parcela atual, ex: 2 se for "2 de 12", ou 1 se não especificado),
-      "parcela_total": number (Total de parcelas contratadas, ex: 12)
-    }
-  ]
-}
-
-Se for "extrato_bancario":
-{
-  "tipo_documento": "extrato_bancario",
-  "transacoes": [
-    {
-      "valor": number (Valor absoluto do lançamento como número decimal positivo. Não coloque sinal de menos. Ex: 27.00 ou 920.00),
-      "estabelecimento": string (Nome da pessoa, empresa ou descrição da transação, ex: "GabrielDeAlmeida" ou "Priscila Aparecida..."),
-      "categoria": string ("alimentação"|"transporte"|"saúde"|"diversão"|"moradia"|"educação"|"compras"|"serviços"|"investimentos"|"receita_extra"|"transferencia"|"outros". 
-                          Dica: se for transferência entre o casal, use "transferencia". 
-                          Se for recebimento de terceiros que não seja do cônjuge, use "receita_extra". 
-                          Se for débito/compra, use a categoria correspondente.),
-      "data": "YYYY-MM-DD" (Data da transação, ex: "2026-07-01")
-    }
-  ]
-}
-ATENÇÃO: Ignore as linhas de resumo diário que começam com "Total de entradas" ou "Total de saídas". Extraia APENAS as transações individuais (como compras no débito, compras via NuPay, transferências enviadas/recebidas, Pix enviado/recebido, tarifas e pagamentos)!`;
+5. Categorias válidas: "alimentação"|"transporte"|"saúde"|"diversão"|"moradia"|"educação"|"compras"|"serviços"|"investimentos"|"receita_extra"|"transferencia"|"outros".
+6. Se for extrato bancário: Extraia individualmente cada transação (débito, crédito, Pix, TED, transferências). Ignore linhas de consolidação como "Total de entradas" ou "Total de saídas". O valor de cada transação deve ser positivo (sem sinal negativo).`;
 
     const extracao = await extrairComFallback(base64, mimeType, prompt);
     const supabase = supabaseServer();
@@ -1171,9 +1168,10 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
 
   const modelCandidates = [
     process.env.GROQ_TEXT_MODEL,
+    'qwen/qwen3.6-27b',
+    'meta-llama/llama-4-scout-17b-16e-instruct',
     'openai/gpt-oss-120b',
     'openai/gpt-oss-20b',
-    'qwen/qwen3.6-27b',
     'qwen/qwen3.8-27b'
   ].filter(Boolean) as string[];
 
