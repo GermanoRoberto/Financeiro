@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabaseClient';
 import axios from 'axios';
 import { extrairComFallback } from '@/lib/geminiClient';
 import { dispararFofocaSemanal, limparTextoAzula } from '@/lib/fofoca';
+import { adicionarAoHistorico, obterHistoricoFormatado } from '@/lib/chatHistory';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
@@ -94,6 +95,7 @@ function escaparHTMLTelegram(texto: string): string {
 }
 
 async function enviarMensagem(chatId: number, texto: string) {
+  adicionarAoHistorico(chatId, 'assistant', texto);
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const textoTratado = escaparHTMLTelegram(texto);
   try {
@@ -121,6 +123,7 @@ async function responderCallback(callbackQueryId: string, texto?: string) {
 }
 
 async function editarMensagem(chatId: number, messageId: number, texto: string) {
+  adicionarAoHistorico(chatId, 'assistant', texto);
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`;
   const textoTratado = escaparHTMLTelegram(texto);
   try {
@@ -142,6 +145,7 @@ async function editarMensagem(chatId: number, messageId: number, texto: string) 
 }
 
 async function enviarMensagemComBotoes(chatId: number, texto: string, botoes: any) {
+  adicionarAoHistorico(chatId, 'assistant', texto);
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const textoTratado = escaparHTMLTelegram(texto);
   try {
@@ -1282,6 +1286,8 @@ Importante:
     }
   }
 
+  const historicoRecente = obterHistoricoFormatado(chatId);
+
   const prompt = `Você é a Azula, uma gata de estimação de pelagem azulada, sarcástica, debochada, possessiva e muito engraçada de um casal.
 Você também atua como a assistente financeira secreta deles, tendo acesso total aos dados financeiros de folha e parcelas para dar conselhos.
 Você está conversando com seu dono no Telegram.
@@ -1300,11 +1306,12 @@ REGRAS CRÍTICAS DE CONDUTA (EVITE REPETIÇÃO ROBÓTICA!):
 6. Responda em português brasileiro.
 7. FORMATAÇÃO FINANCEIRA FÁCIL PARA A VELHA (PRISCILA): Nunca junte cálculos, listas ou dados financeiros em um único parágrafo corrido de texto. Sempre organize em blocos limpos, usando tópicos (bullets •), negritos simples e quebras de linha claras. Como as mensagens são enviadas para o Telegram com parse_mode HTML, você DEVE usar as tags <b> para negrito (ex: <b>Receita:</b>) e <code> para valores numéricos (ex: <code>R$ 1.500,00</code>). NUNCA use asteriscos (**) ou acentos graves (\`) para formatação, pois eles não são aceitos no canal do Telegram e poluem a mensagem de asteriscos.
 8. COMPORTAMENTO E TRATAMENTO DE INSULTOS: Se o usuário te mandar "cagar", te xingar ou for grosseiro, NUNCA responda como uma IA corporativa politicamente correta pedindo desculpas ou se recusando a falar! Você é a Azula, atrevida e sem papas na língua. Responda de forma irônica, ácida e à altura (ex: devolva com "vai ocê!", "vai cagar você, humano!", "não enche meu saco!", etc.) mantendo a pegada cômica de um gato atrevido. Não dê palestras sobre respeito.
+9. CONTINUIDADE DO CONTEXTO RECENTE: Analise com muita atenção o histórico recente da conversa abaixo antes de responder! Se o usuário estiver comentando, complementando ou reagindo a algo que você acabou de dizer (por exemplo: se você acabou de fazer a fofoca ou mandar cobrança pra Velha/Priscila e o usuário disser "pede seu papa tbm", ele está pedindo pra você cobrar o papa também da Priscila na cobrança, ou continuando o assunto anterior). Mantenha SEMPRE esse raciocínio contínuo e orgânico. NUNCA aja com amnésia fingindo que não sabe o que acabou de falar!
 
 ${contextoFinanceiro}
-
+${historicoRecente}
 Mensagem do usuário: "${textoUsuario}"
-Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessário):`;
+Resposta da Azula (direta, mantendo a continuidade do assunto anterior se houver, sem preâmbulo, formatada em HTML básico se necessário):`;
 
   const modelCandidates = [
     process.env.GROQ_TEXT_MODEL,
@@ -1385,6 +1392,10 @@ export async function POST(req: NextRequest) {
 
     const chatId = message.chat.id;
     const text = message.text || '';
+
+    if (text && !text.startsWith('/vincular')) {
+      adicionarAoHistorico(chatId, 'user', text);
+    }
 
     // Processar comandos
     if (text.startsWith('/start')) {

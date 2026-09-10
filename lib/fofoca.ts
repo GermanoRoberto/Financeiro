@@ -1,5 +1,6 @@
 import { supabaseServer } from '@/lib/supabaseClient';
 import axios from 'axios';
+import { adicionarAoHistorico } from '@/lib/chatHistory';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
@@ -35,6 +36,7 @@ export function escaparHTMLTelegram(texto: string): string {
 }
 
 export async function enviarMensagemTelegram(chatId: number, texto: string) {
+  adicionarAoHistorico(chatId, 'assistant', texto);
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const textoTratado = escaparHTMLTelegram(texto);
   try {
