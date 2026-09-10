@@ -918,6 +918,35 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
         }
       }
 
+      // Se o contracheque trouxe contratos de empréstimo anexos, registra-os nas dívidas (inativos para não duplicar projeção)
+      if (extracao.contratos_emprestimo && extracao.contratos_emprestimo.length > 0) {
+        for (const contrato of extracao.contratos_emprestimo) {
+          const parcelasRestantes = (contrato.parcela_total || 12) - (contrato.parcela_atual || 1) + 1;
+          const credorStr = `Consignado: ${contrato.credor || 'Consignado'} (Contrato ${contrato.numero_contrato || 'N/D'})`;
+          
+          const { data: divExistente } = await supabase
+            .from('dividas')
+            .select('*')
+            .eq('usuario_id', usuarioDonoId)
+            .eq('credor', credorStr)
+            .maybeSingle();
+
+          if (!divExistente) {
+            await supabase
+              .from('dividas')
+              .insert({
+                usuario_id: usuarioDonoId,
+                credor: credorStr,
+                valor_total: 0,
+                valor_parcela: 0,
+                parcelas_restantes: parcelasRestantes,
+                vencimento_dia: 10,
+                ativa: false
+              });
+          }
+        }
+      }
+
       await enviarMensagem(chatId, obterFalaAzula(msgRetorno));
     } else if (extracao.tipo_documento === 'contratos_emprestimo') {
       const contratos = extracao.contratos || [];
@@ -1033,10 +1062,21 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
     }
   } catch (err: any) {
     console.error('Erro no processamento do arquivo:', err.message);
-    await enviarMensagem(
-      chatId,
-      obterFalaAzula('😾 Eita humano(a), essa foto ou arquivo ficou difícil de ler até pros meus olhos de gato! Não consegui identificar os valores com certeza.\n\nMe ajuda aí: só digita aqui no chat quanto foi e onde você gastou (ex: <code>mercado 85</code> ou <code>farmácia 42,90</code>) que eu anoto na hora!')
-    );
+    const isDoc = !!message.document;
+    const docName = (message.document?.file_name || '').toLowerCase();
+    const isLikelyContracheque = isDoc && (docName.includes('contracheque') || docName.includes('mensal') || docName.includes('folha') || docName.includes('recibo') || docName.endsWith('.pdf'));
+
+    if (isLikelyContracheque) {
+      await enviarMensagem(
+        chatId,
+        obterFalaAzula('😾 Miau... Tentei ler seu contracheque/documento, mas o arquivo veio truncado pros meus olhos felinos! Se puder, envie pelo painel web ou me diga os valores de bruto e líquido por aqui!')
+      );
+    } else {
+      await enviarMensagem(
+        chatId,
+        obterFalaAzula('😾 Eita humano(a), essa foto ou arquivo ficou difícil de ler até pros meus olhos de gato! Não consegui identificar os valores com certeza.\n\nMe ajuda aí: só digita aqui no chat quanto foi e onde você gastou (ex: <code>mercado 85</code> ou <code>farmácia 42,90</code>) que eu anoto na hora!')
+      );
+    }
   }
 }
 

@@ -418,6 +418,24 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
           };
         }
       }
+
+      // 5. Contracheque Camilo dos Santos (Germano)
+      if (textToParse.includes('RODOVIARIO CAMILO DOS SANTOS') || textToParse.includes('CAMILO DOS SANTOS')) {
+        console.log('Detectado Contracheque Camilo dos Santos! Processando localmente sem IA...');
+        const cc = parseContrachequeCamiloLocal(textToParse);
+        if (cc) {
+          return cc;
+        }
+      }
+
+      // 6. Contracheque Prefeitura de Juiz de Fora (Priscila)
+      if (textToParse.includes('PREFEITURA DE JUIZ DE FORA') || textToParse.includes('MUNICÍPIO DE JUIZ DE FORA')) {
+        console.log('Detectado Contracheque PJF! Processando localmente sem IA...');
+        const cc = parseContrachequePjfLocal(textToParse);
+        if (cc) {
+          return cc;
+        }
+      }
     } catch (localError: any) {
       console.warn('Falha ao rodar parser local de regex:', localError.message);
     }
@@ -654,6 +672,187 @@ function parseCaixaTxtLocal(text: string): any[] {
     }
   }
   return transactions;
+}
+
+function parseContrachequeCamiloLocal(text: string): any {
+  const isCamilo = (text.includes('RODOVIARIO CAMILO DOS SANTOS') || text.includes('CAMILO DOS SANTOS')) &&
+                   (text.includes('DEMONSTRATIVO DE PAGAMENTO') || text.includes('RECIBO DE PAGAMENTO') || text.includes('DEMONSTRATIVO DE PAGAMENTO - Folha Normal'));
+  if (!isCamilo) return null;
+
+  const parseMoeda = (s?: string) => s ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : 0;
+
+  const provMatch = text.match(/Proventos:?\s*R\$\s*([\d\.,]+)/i) || text.match(/R\$\s*([\d\.,]+)\s*Proventos/i);
+  const descMatch = text.match(/Descontos:?\s*R\$\s*([\d\.,]+)/i) || text.match(/R\$\s*([\d\.,]+)\s*Descontos/i);
+  const liqMatch = text.match(/Valor líquido:?\s*R\$\s*([\d\.,]+)/i) || text.match(/R\$\s*([\d\.,]+)\s*Valor líquido/i);
+  const refMatch = text.match(/Referência:?\s*(\d{2})\/(\d{4})/i);
+
+  const salarioBruto = parseMoeda(provMatch?.[1]);
+  const totalDescontosDoc = parseMoeda(descMatch?.[1]);
+  const salarioLiquido = parseMoeda(liqMatch?.[1]) || (salarioBruto > 0 && totalDescontosDoc > 0 ? salarioBruto - totalDescontosDoc : 0);
+  const mesReferencia = refMatch ? `${refMatch[2]}-${refMatch[1]}` : new Date().toISOString().substring(0, 7);
+
+  const proventosKeywords = [
+    'SALARIO BASE', 'ARREDONTAMENTO', 'RESSARC. PROV', 'ATESTADO MEDICO',
+    'HORA EXTRA', 'DSR', 'GRATIFICACAO', 'INSALUBRIDADE', 'PERICULOSIDADE', 'PROVENTO'
+  ];
+
+  const codigosConhecidos: Record<string, string> = {
+    'SALARIO BASE': '1',
+    'ARREDONTAMENTO': '500',
+    'RESSARC. PROV. CRED. ADTO': '10104',
+    'ATESTADO MEDICO': '10130',
+    'UNIMED ODONTO DEPENDENTE': '126',
+    'COPARTICIPAÇÃO PLASC': '144',
+    'DESC ARRED MES ANTERIOR': '501',
+    'DESC ADIANTAMENTO QUINZENAL': '651',
+    'INSS': '9010',
+    'COPARTICIPAÇÃO PLASC PARC EV': '10014',
+    'CONTRIBUICAO  NEGOCIAL ADM': '10056',
+    'CONTRIBUICAO NEGOCIAL ADM': '10056',
+    'DESCONTO CRÉDITO TRABALHADOR': '10096',
+    'IRRF': '9012'
+  };
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const descontos: any[] = [];
+  const proventos: any[] = [];
+
+  for (const line of lines) {
+    const m = line.match(/^(\d+?[\d\.,]+?)([A-ZÀ-Ú].+?)(\d+,\d{3})$/);
+    if (m) {
+      const prefix = m[1];
+      const desc = m[2].trim();
+
+      let valorFinal: number | null = null;
+
+      for (const [nome, cod] of Object.entries(codigosConhecidos)) {
+        if (desc.includes(nome) && prefix.startsWith(cod)) {
+          const valStr = prefix.substring(cod.length);
+          if (valStr.includes(',')) {
+            valorFinal = parseMoeda(valStr);
+            break;
+          }
+        }
+      }
+
+      if (valorFinal === null) {
+        for (let codLen = 1; codLen <= 5; codLen++) {
+          if (prefix.length > codLen) {
+            const candVal = prefix.substring(codLen);
+            if (/^\d{1,3}(?:\.\d{3})*,\d{2}$/.test(candVal)) {
+              valorFinal = parseMoeda(candVal);
+              break;
+            }
+          }
+        }
+      }
+
+      if (valorFinal !== null && valorFinal > 0) {
+        const isProv = proventosKeywords.some(kw => desc.includes(kw));
+        if (isProv) {
+          proventos.push({ tipo: desc, valor: valorFinal });
+        } else {
+          descontos.push({
+            tipo: desc,
+            valor: valorFinal,
+            parcela_atual: null,
+            parcela_total: null,
+            recorrente: !desc.includes('ADIANTAMENTO')
+          });
+        }
+      }
+    }
+  }
+
+  // Contratos de empréstimo anexos (se houver páginas de Crédito do Trabalhador)
+  const contratos: any[] = [];
+  const contractBlocks = text.split(/CRÉDITO DO TRABALHADOR/i);
+  for (let i = 1; i < contractBlocks.length; i++) {
+    const block = contractBlocks[i];
+    const numMatch = block.match(/(\d{6,12})\s*NÚMERO DO CONTRATO:/i) || block.match(/NÚMERO DO CONTRATO:\s*(\d{6,12})/i);
+    let credor = 'PARATI CFI S A';
+    if (block.includes('PICPAY')) credor = 'PICPAY BANK';
+    else if (block.includes('PARATI')) credor = 'PARATI CFI S A';
+    else if (block.includes('SANTANDER')) credor = 'SANTANDER';
+    else if (block.includes('BRADESCO')) credor = 'BRADESCO';
+    else if (block.includes('ITAU') || block.includes('ITAÚ')) credor = 'ITAÚ';
+    else if (block.includes('CAIXA')) credor = 'CAIXA';
+
+    const intMatches = block.match(/^\s*(\d{1,2})\s*$/gm);
+    const parcAtual = (intMatches && intMatches.length > 0) ? parseInt(intMatches[0].trim(), 10) : 1;
+    const parcTotal = (intMatches && intMatches.length > 1) ? parseInt(intMatches[1].trim(), 10) : 12;
+
+    if (numMatch) {
+      contratos.push({
+        numero_contrato: numMatch[1],
+        credor: credor,
+        parcela_atual: parcAtual,
+        parcela_total: parcTotal
+      });
+    }
+  }
+
+  const isAdiantamento = (salarioBruto === salarioLiquido && salarioLiquido > 0 && descontos.length === 0) ||
+                         text.includes('DEMONSTRATIVO DE ADIANTAMENTO');
+
+  return {
+    tipo_documento: 'contracheque',
+    nome_funcionario: 'GERMANO ROBERTO DO CARMO SOBRINHO',
+    is_adiantamento: isAdiantamento,
+    salario_bruto: salarioBruto,
+    salario_liquido: salarioLiquido,
+    mes_referencia: mesReferencia,
+    descontos: descontos,
+    contratos_emprestimo: contratos
+  };
+}
+
+function parseContrachequePjfLocal(text: string): any {
+  const isPjf = text.includes('PREFEITURA DE JUIZ DE FORA') || text.includes('MUNICÍPIO DE JUIZ DE FORA');
+  if (!isPjf) return null;
+
+  const parseMoeda = (s?: string) => s ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : 0;
+
+  const refMatch = text.match(/(?:Mês\/Ano|Referência|Competência):?\s*(\d{2})\/(\d{4})/i);
+  const mesReferencia = refMatch ? `${refMatch[2]}-${refMatch[1]}` : new Date().toISOString().substring(0, 7);
+
+  const provMatch = text.match(/(?:Total de Vencimentos|Total de Proventos|Proventos):?\s*R?\$?\s*([\d\.,]+)/i);
+  const descMatch = text.match(/(?:Total de Descontos|Descontos):?\s*R?\$?\s*([\d\.,]+)/i);
+  const liqMatch = text.match(/(?:Líquido a Receber|Total Líquido|Valor Líquido):?\s*R?\$?\s*([\d\.,]+)/i);
+
+  const salarioBruto = parseMoeda(provMatch?.[1]);
+  const totalDescontos = parseMoeda(descMatch?.[1]);
+  const salarioLiquido = parseMoeda(liqMatch?.[1]);
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const descontos: any[] = [];
+
+  for (const line of lines) {
+    const m = line.match(/^(\d+)\s+([A-ZÀ-Ú0-9\.\s\/\-\(\)]+?)\s+(\d+,\d{2,4})\s+([\d\.,]+)$/);
+    if (m) {
+      const desc = m[2].trim();
+      const val = parseMoeda(m[4]);
+      if (val > 0) {
+        descontos.push({
+          tipo: desc,
+          valor: val,
+          parcela_atual: null,
+          parcela_total: null,
+          recorrente: true
+        });
+      }
+    }
+  }
+
+  return {
+    tipo_documento: 'contracheque',
+    nome_funcionario: 'PRISCILA APARECIDA DA SILVA TOLEDO',
+    is_adiantamento: false,
+    salario_bruto: salarioBruto || (salarioLiquido + totalDescontos),
+    salario_liquido: salarioLiquido,
+    mes_referencia: mesReferencia,
+    descontos: descontos
+  };
 }
 
 async function extrairComGeminiPDF(base64: string, prompt: string): Promise<any> {
