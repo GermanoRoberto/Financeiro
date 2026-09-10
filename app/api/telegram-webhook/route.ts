@@ -165,6 +165,73 @@ async function enviarMensagemComBotoes(chatId: number, texto: string, botoes: an
   }
 }
 
+function parseNumeroBR(numStr: string): number {
+  let s = numStr.trim();
+  if (s.includes('.') && s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.includes(',')) {
+    s = s.replace(',', '.');
+  } else if (s.includes('.')) {
+    const partes = s.split('.');
+    if (partes[partes.length - 1].length === 3 && partes.length > 1 && partes[0].length <= 3) {
+      s = s.replace(/\./g, '');
+    }
+  }
+  return parseFloat(s) || 0;
+}
+
+function inferirCategoria(est: string): string {
+  const e = est.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/mercado|supermercado|padaria|acougue|hortifruti|sacolao|ifood|lanche|restaurante|almoco|jantar|pizza|hamburguer|comida|cafe|padoca|bar|churrasco/.test(e)) return 'alimentação';
+  if (/uber|99|gasolina|posto|combustivel|etanol|diesel|estacionamento|pedagio|onibus|metro|passagem|taxi|oficina|mecanico/.test(e)) return 'transporte';
+  if (/farmacia|drogaria|remedio|medico|consulta|dentista|exame|hospital|plano|psicolog|saude/.test(e)) return 'saúde';
+  if (/cinema|filme|show|jogo|jogos|passeio|viagem|parque|teatro|festa/.test(e)) return 'diversão';
+  if (/aluguel|condominio|luz|agua|energia|gas|vivo|claro|tim|oi|internet|iptu|casa|reforma|limpeza|diarista/.test(e)) return 'moradia';
+  if (/curso|faculdade|escola|livro|mensalidade|educacao|aula/.test(e)) return 'educação';
+  if (/roupa|calcado|loja|vestuario|shopee|shein|aliexpress|mercado livre|amazon|magazine|presente/.test(e)) return 'compras';
+  if (/spotify|netflix|disney|hbo|prime|academia|smartfit|corte|cabelo|salao|manicure|barbearia/.test(e)) return 'serviços';
+  return 'outros';
+}
+
+function detectarGastoRapido(texto: string): { valor: number; estabelecimento: string } | null {
+  const t = texto.trim();
+  if (t.startsWith('/') || t.length > 80) return null;
+
+  // 1. 'gastei/paguei [valor] em/no/na [texto]' (ex: 'gastei 50 no mercado')
+  const matchPaguei = t.match(/^(?:gastei|paguei|comprei)\s+(?:R\$\s*)?(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:reais|real)?\s+(?:no|na|em|de|com|pra)?\s*(.+)$/i);
+  if (matchPaguei) {
+    const valor = parseNumeroBR(matchPaguei[1]);
+    const est = matchPaguei[2].trim();
+    if (valor > 0 && est.length >= 2) return { valor, estabelecimento: est };
+  }
+
+  // 2. 'gastei/paguei [texto] [valor]' (ex: 'paguei farmácia 42,90')
+  const matchPagueiInvertido = t.match(/^(?:gastei|paguei|comprei)\s+(.+?)\s+(?:R\$\s*)?(\d{1,5}(?:[.,]\d{1,2})?)(?:\s*(?:reais|real))?$/i);
+  if (matchPagueiInvertido) {
+    const valor = parseNumeroBR(matchPagueiInvertido[2]);
+    const est = matchPagueiInvertido[1].replace(/^(?:no|na|em|de|com|pra)\s+/i, '').trim();
+    if (valor > 0 && est.length >= 2) return { valor, estabelecimento: est };
+  }
+
+  // 3. '[texto] [valor]' (ex: 'mercado 85', 'uber 15,50')
+  const matchTextoValor = t.match(/^([a-zA-ZÀ-ÿ\s]{2,40})\s+(?:R\$\s*)?(\d{1,5}(?:[.,]\d{1,2})?)(?:\s*(?:reais|real))?$/i);
+  if (matchTextoValor) {
+    const valor = parseNumeroBR(matchTextoValor[2]);
+    const est = matchTextoValor[1].trim();
+    if (valor > 0 && est.length >= 2) return { valor, estabelecimento: est };
+  }
+
+  // 4. '[valor] [texto]' (ex: '85 mercado', '15.50 uber')
+  const matchValorTexto = t.match(/^(?:R\$\s*)?(\d{1,5}(?:[.,]\d{1,2})?)(?:\s*(?:reais|real))?\s+([a-zA-ZÀ-ÿ\s]{2,40})$/i);
+  if (matchValorTexto) {
+    const valor = parseNumeroBR(matchValorTexto[1]);
+    const est = matchValorTexto[2].trim();
+    if (valor > 0 && est.length >= 2) return { valor, estabelecimento: est };
+  }
+
+  return null;
+}
+
 const botoesCategorias = (gastoId: string) => [
   [
     { text: '🍔 Alimentação', callback_data: `cat_alimentacao_${gastoId}` },
@@ -470,6 +537,37 @@ async function processarArquivoTelegram(chatId: number, message: any) {
       obterFalaAzula('😾 Sua conta não está vinculada! Use <b>/vincular &lt;codigo&gt;</b> ou suma daqui.')
     );
     return;
+  }
+
+  // 0. Se a mensagem contiver legenda (caption) com gasto explícito (ex: "mercado 85"), prioriza a legenda sem depender de IA!
+  if (message.caption) {
+    const gastoRapido = detectarGastoRapido(message.caption);
+    if (gastoRapido) {
+      const supabase = supabaseServer();
+      const categoriaInferida = inferirCategoria(gastoRapido.estabelecimento);
+      const dataISO = new Date().toISOString().substring(0, 10);
+      
+      const { data: gasto, error: errGasto } = await supabase
+        .from('gastos_diarios')
+        .insert({
+          usuario_id: usuario.id,
+          valor: gastoRapido.valor,
+          estabelecimento: gastoRapido.estabelecimento,
+          categoria: categoriaInferida,
+          data: dataISO,
+          origem: 'telegram',
+          confirmado: true
+        })
+        .select()
+        .single();
+
+      if (!errGasto && gasto) {
+        const valorFormatado = gastoRapido.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const msgText = obterFalaAzula(`😼 Já anotei pela sua legenda! Registrei <b>R$ ${valorFormatado}</b> no(a) <b>${gastoRapido.estabelecimento}</b> como <b>${categoriaInferida}</b>. Nem precisei cansar meus olhos de gato com a foto!`);
+        await enviarMensagemComBotoes(chatId, msgText, botoesCategorias(gasto.id));
+        return;
+      }
+    }
   }
 
   // Feedback imediato de que a Azula começou a processar o arquivo
@@ -936,7 +1034,7 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
     console.error('Erro no processamento do arquivo:', err.message);
     await enviarMensagem(
       chatId,
-      obterFalaAzula(`😾 Erro ao tentar processar o arquivo: ${err.message}. Tem certeza de que é um contracheque legível ou um comprovante de gasto válido?`)
+      obterFalaAzula('😾 Eita humano(a), essa foto ou arquivo ficou difícil de ler até pros meus olhos de gato! Não consegui identificar os valores com certeza.\n\nMe ajuda aí: só digita aqui no chat quanto foi e onde você gastou (ex: <code>mercado 85</code> ou <code>farmácia 42,90</code>) que eu anoto na hora!')
     );
   }
 }
@@ -1261,6 +1359,38 @@ export async function POST(req: NextRequest) {
     } else if (message.photo || message.document) {
       await processarArquivoTelegram(chatId, message);
     } else {
+      // 1. Lançamento rápido de gasto por texto direto (ex: "mercado 85", "uber 18.50", "gastei 50 no posto")
+      const gastoRapido = detectarGastoRapido(text);
+      if (gastoRapido) {
+        const { data: usuario } = await obterUsuarioPorTelegramId(chatId);
+        if (usuario) {
+          const supabase = supabaseServer();
+          const categoriaInferida = inferirCategoria(gastoRapido.estabelecimento);
+          const dataISO = new Date().toISOString().substring(0, 10);
+          
+          const { data: gasto, error: errGasto } = await supabase
+            .from('gastos_diarios')
+            .insert({
+              usuario_id: usuario.id,
+              valor: gastoRapido.valor,
+              estabelecimento: gastoRapido.estabelecimento,
+              categoria: categoriaInferida,
+              data: dataISO,
+              origem: 'telegram',
+              confirmado: true
+            })
+            .select()
+            .single();
+
+          if (!errGasto && gasto) {
+            const valorFormatado = gastoRapido.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+            const msgText = obterFalaAzula(`😼 Anotei aqui! Registrei seu gasto de <b>R$ ${valorFormatado}</b> no(a) <b>${gastoRapido.estabelecimento}</b> como <b>${categoriaInferida}</b>. Menos dinheiro pra torrar agora!`);
+            await enviarMensagemComBotoes(chatId, msgText, botoesCategorias(gasto.id));
+            return NextResponse.json({ ok: true });
+          }
+        }
+      }
+
       const session = getSessionState(chatId);
       const textClean = text.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g,"");
 
