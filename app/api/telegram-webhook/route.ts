@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseClient';
 import axios from 'axios';
 import { extrairComFallback } from '@/lib/geminiClient';
+import { dispararFofocaSemanal } from '@/lib/fofoca';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
@@ -1351,10 +1352,12 @@ export async function POST(req: NextRequest) {
       await handleResumo(chatId);
     } else if (text === '/dividas') {
       await handleDividas(chatId);
+    } else if (text === '/fofoca' || text.startsWith('/fofoca') || text === '/dedoduro') {
+      await dispararFofocaSemanal(chatId);
     } else if (text.startsWith('/')) {
       await enviarMensagem(
         chatId,
-        obterFalaAzula('😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas.')
+        obterFalaAzula('😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas, /fofoca.')
       );
     } else if (message.photo || message.document) {
       await processarArquivoTelegram(chatId, message);
@@ -1389,6 +1392,25 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ ok: true });
           }
         }
+      }
+
+      // 2. Interceptação de pedido de fofoca/dedo-duro por texto natural (ex: "modo fofoca", "fofoca", "dedo duro", "forçar fofoca")
+      const textNorm = text.trim().toLowerCase();
+      if (
+        textNorm === 'fofoca' ||
+        textNorm === 'modo fofoca' ||
+        textNorm === 'dedo duro' ||
+        textNorm.includes('forçar o modo fofoca') ||
+        textNorm.includes('forcar o modo fofoca') ||
+        textNorm.includes('forçar modo fofoca') ||
+        textNorm.includes('forcar modo fofoca') ||
+        textNorm.includes('forçar fofoca') ||
+        textNorm.includes('forcar fofoca') ||
+        textNorm.includes('faz a fofoca') ||
+        textNorm.includes('manda a fofoca')
+      ) {
+        await dispararFofocaSemanal(chatId);
+        return NextResponse.json({ ok: true });
       }
 
       const session = getSessionState(chatId);
