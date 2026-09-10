@@ -1397,12 +1397,12 @@ export async function POST(req: NextRequest) {
       await handleResumo(chatId);
     } else if (text === '/dividas') {
       await handleDividas(chatId);
-    } else if (text === '/fofoca' || text.startsWith('/fofoca') || text === '/dedoduro') {
+    } else if (text === '/fofoca' || text.startsWith('/fofoca') || text === '/dedoduro' || text === '/cobrar') {
       await dispararFofocaSemanal(chatId);
     } else if (text.startsWith('/')) {
       await enviarMensagem(
         chatId,
-        obterFalaAzula('😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas, /fofoca.')
+        obterFalaAzula('😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas, /fofoca, /cobrar.')
       );
     } else if (message.photo || message.document) {
       await processarArquivoTelegram(chatId, message);
@@ -1439,12 +1439,13 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 2. Interceptação de pedido de fofoca/dedo-duro por texto natural (ex: "modo fofoca", "fofoca", "dedo duro", "forçar fofoca")
+      // 2. Interceptação de pedido de fofoca/dedo-duro/cobrança por texto natural (ex: "modo fofoca", "fofoca", "dedo duro", "forçar fofoca", "cobra a priscila", "manda mensagem pra priscila")
       const textNorm = text.trim().toLowerCase();
       if (
         textNorm === 'fofoca' ||
         textNorm === 'modo fofoca' ||
         textNorm === 'dedo duro' ||
+        textNorm === 'cobrar' ||
         textNorm.includes('forçar o modo fofoca') ||
         textNorm.includes('forcar o modo fofoca') ||
         textNorm.includes('forçar modo fofoca') ||
@@ -1452,7 +1453,19 @@ export async function POST(req: NextRequest) {
         textNorm.includes('forçar fofoca') ||
         textNorm.includes('forcar fofoca') ||
         textNorm.includes('faz a fofoca') ||
-        textNorm.includes('manda a fofoca')
+        textNorm.includes('manda a fofoca') ||
+        textNorm.includes('cobra a priscila') ||
+        textNorm.includes('cobrar a priscila') ||
+        textNorm.includes('cobra a velha') ||
+        textNorm.includes('cobrar a velha') ||
+        textNorm.includes('manda mensagem pra priscila') ||
+        textNorm.includes('manda mensagem para a priscila') ||
+        textNorm.includes('manda mensagem pra velha') ||
+        textNorm.includes('manda mensagem para a velha') ||
+        textNorm.includes('puxa a orelha da priscila') ||
+        textNorm.includes('puxa a orelha da velha') ||
+        textNorm.includes('dispara pra priscila') ||
+        textNorm.includes('dispara para a priscila')
       ) {
         await dispararFofocaSemanal(chatId);
         return NextResponse.json({ ok: true });

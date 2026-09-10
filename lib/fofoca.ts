@@ -308,7 +308,7 @@ INSTRUÇÕES OBRIGATÓRIAS:
     const nomeOutro = solicitante?.email === 'germanorcarmo@gmail.com' ? 'a Velha (Priscila)' : 'o Germano';
     await enviarMensagemTelegram(
       chatIdSolicitante,
-      `😼 <b>Prontinho!</b> Já fui fofoqueira e dedo-duro com sucesso! Puxei a orelha d'${nomeOutro} e mandei cobrança pra geral! muéhehehehe. 🐾`
+      `😼 <b>Missão cumprida!</b> Além de te dedurar tudo aqui, acabei de mandar uma cobrança direta lá no Telegram d'${nomeOutro} puxando a orelha e exigindo os comprovantes e contracheques atrasados! muéhehehehe. 🐾`
     );
   }
 
