@@ -60,21 +60,29 @@ async function chamarGroq(prompt: string): Promise<string> {
   if (!GROQ_API_KEY) return '';
 
   const modelCandidates = [
-    'llama-3.3-70b-versatile',
-    'llama-3.2-3b-preview',
-    'llama-3.2-11b-vision-preview'
-  ];
+    process.env.GROQ_TEXT_MODEL,
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.6-27b',
+    'qwen/qwen3.8-27b'
+  ].filter(Boolean) as string[];
 
   for (const model of modelCandidates) {
     try {
+      const payload: any = {
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.8,
+        max_tokens: 800
+      };
+
+      if (model.includes('gpt-oss')) {
+        payload.reasoning_format = 'hidden';
+      }
+
       const response = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',
-        {
-          model: model,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.8,
-          max_tokens: 800
-        },
+        payload,
         {
           headers: {
             'Authorization': `Bearer ${GROQ_API_KEY}`,
@@ -83,8 +91,9 @@ async function chamarGroq(prompt: string): Promise<string> {
           timeout: 4500
         }
       );
-      const content = response.data.choices?.[0]?.message?.content || '';
-      if (content.trim()) return content.trim();
+      let content = response.data.choices?.[0]?.message?.content || '';
+      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      if (content) return content;
     } catch (e: any) {
       console.warn(`Groq model ${model} falhou ou timed out no cron: ${e.message}`);
     }

@@ -1168,8 +1168,10 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
 
   const modelCandidates = [
     process.env.GROQ_TEXT_MODEL,
-    'llama-3.3-70b-versatile',
-    'openai/gpt-oss-20b'
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.6-27b',
+    'qwen/qwen3.8-27b'
   ].filter(Boolean) as string[];
 
   let lastChatError: any = null;
@@ -1177,16 +1179,22 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
   for (const model of modelCandidates) {
     try {
       console.log(`Tentando conversa com modelo Groq: ${model}...`);
+      const payload: any = {
+        model: model,
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500
+      };
+
+      if (model.includes('gpt-oss')) {
+        payload.reasoning_format = 'hidden';
+      }
+
       const response = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',
-        {
-          model: model,
-          messages: [
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 1500
-        },
+        payload,
         {
           headers: {
             'Authorization': `Bearer ${GROQ_API_KEY}`,
@@ -1196,7 +1204,9 @@ Resposta da Azula (direta, sem preâmbulo, formatada em HTML básico se necessá
         }
       );
 
-      return response.data.choices?.[0]?.message?.content || '😼 Bué!';
+      let content = response.data.choices?.[0]?.message?.content || '';
+      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      return content || '😼 Bué!';
     } catch (error: any) {
       console.warn(`Falha na conversa com o modelo Groq ${model}: ${error.message}. Tentando próximo candidato...`);
       lastChatError = error;

@@ -91,22 +91,36 @@ Formato do JSON esperado:
         "Content-Type": "application/json"
     }
     
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.1,
-        "response_format": {"type": "json_object"}
-    }
-    
-    response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
-    if response.status_code != 200:
-        raise Exception(f"Erro na API do Groq: {response.text}")
+    candidates = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b"]
+    last_err = None
+
+    for model in candidates:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"}
+        }
+        if "gpt-oss" in model:
+            payload["reasoning_format"] = "hidden"
         
-    res_data = response.json()
-    conteudo = res_data['choices'][0]['message']['content']
-    return json.loads(conteudo)
+        try:
+            response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=20)
+            if response.status_code != 200:
+                raise Exception(f"Erro na API do Groq ({model}): {response.text}")
+                
+            res_data = response.json()
+            conteudo = res_data['choices'][0]['message']['content'] or ""
+            import re
+            conteudo = re.sub(r'<think>[\s\S]*?</think>', '', conteudo).strip()
+            return json.loads(conteudo)
+        except Exception as e:
+            print(f"⚠️ Modelo {model} falhou: {e}. Tentando próximo...")
+            last_err = e
+
+    raise last_err or Exception("Todos os modelos da Groq falharam.")
 
 def selecionar_usuario():
     headers = {

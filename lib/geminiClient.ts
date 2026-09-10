@@ -88,19 +88,19 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
   // Lista de candidatos de modelos de imagem (Visão/OCR da Groq)
   const visionCandidates = [
     process.env.GROQ_VISION_MODEL,
-    'llama-3.2-11b-vision-preview',
-    'llama-3.2-90b-vision-preview'
+    'qwen/qwen3.6-27b',
+    'qwen/qwen3.8-27b',
+    'meta-llama/llama-4-scout-17b-16e-instruct'
   ].filter(Boolean) as string[];
 
-  // Lista de candidatos de modelos de texto
+  // Lista de candidatos de modelos de texto (Modelos ativos após a depreciação de agosto/2026)
   const textCandidates = [
     process.env.GROQ_TEXT_MODEL,
-    'llama-3.3-70b-versatile',
-    'llama-3.2-3b-preview',
-    'llama-3.2-1b-preview',
-    'llama-3.2-11b-vision-preview'
-  ].filter(Boolean)
-   .filter(model => model !== 'llama-3.1-8b-instant') as string[];
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.6-27b',
+    'qwen/qwen3.8-27b'
+  ].filter(Boolean) as string[];
 
   const candidates = isImage && !isTextOnly ? visionCandidates : textCandidates;
   const errorsList: string[] = [];
@@ -134,12 +134,13 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
       payload = {
         model: model,
         messages: messages,
-        temperature: 0.1
+        temperature: 0.1,
+        response_format: { type: 'json_object' }
       };
 
-      // Apenas forçamos response_format json_object nos modelos Llama de texto conhecidos para evitar quebras em outros modelos
-      if (model.includes('llama-3.3') || model.includes('llama-3.1')) {
-        payload.response_format = { type: 'json_object' };
+      // Modelos de raciocínio da OpenAI/Groq (GPT-OSS) exigem reasoning_format hidden com JSON Mode
+      if (model.includes('gpt-oss')) {
+        payload.reasoning_format = 'hidden';
       }
 
       const response = await axios.post(
@@ -154,7 +155,10 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
         }
       );
 
-      const textContent = response.data.choices?.[0]?.message?.content || '';
+      let textContent = response.data.choices?.[0]?.message?.content || '';
+      // Remove eventuais tags <think>...</think> do modelo
+      textContent = textContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
       const inicio = textContent.indexOf('{');
       const fim = textContent.lastIndexOf('}');
       let jsonStr = textContent;
@@ -201,7 +205,8 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
                 timeout: 12000
               }
             );
-            const textContentRetry = responseRetry.data.choices?.[0]?.message?.content || '';
+            let textContentRetry = responseRetry.data.choices?.[0]?.message?.content || '';
+            textContentRetry = textContentRetry.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
             const inicioRetry = textContentRetry.indexOf('{');
             const fimRetry = textContentRetry.lastIndexOf('}');
             let jsonStrRetry = textContentRetry;
