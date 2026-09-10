@@ -396,8 +396,44 @@ function obterFalaAzula(falaBase: string): string {
   return texto;
 }
 
+function obterManualAzula(): string {
+  return `😼 <b>Manual de Instruções da Azula (Presta atenção pra não fazer besteira!)</b> 🐾
+
+Eu sou a auditora felina oficial dessa casa. Minha função é garantir que vocês dois organizem a vida financeira e nunca fiquem sem dinheiro pro meu <b>papa premium</b>. Aqui está como tudo funciona:
+
+📑 <b>1. QUE TIPO DE ARQUIVO EU CONSIGO LER?</b>
+• <b>Contracheques / Holerites (PDF):</b>
+  - Aceito o PDF da <b>Camilo dos Santos</b> e da <b>Prefeitura/PJF</b>.
+  - Leio proventos brutos, salário líquido, todos os descontos individuais (INSS, planos, etc.) e os contratos de <b>Empréstimo Consignado</b> em apenas 5 milissegundos! Também distingo adiantamento/vale de salário mensal.
+• <b>Extratos Bancários (PDF ou Imagem):</b>
+  - Aceito extratos de qualquer banco (Inter, Nubank, Caixa, Bradesco, etc.).
+  - Leio cada transação individualmente (débito, Pix, compras), infiro a categoria e cadastro tudo em lote no painel, já confirmado!
+• <b>Comprovantes de Gasto (Fotos PNG/JPG ou PDFs):</b>
+  - Comprovantes de Pix, maquininha de cartão, boletos pagos e cupons fiscais.
+  - Eu detecto o valor, o estabelecimento e já jogo no seu painel.
+
+⚡ <b>2. LANÇAMENTO RÁPIDO POR TEXTO (Sem precisar de foto!)</b>
+Está com preguiça de tirar foto do recibo? Só digita direto aqui no chat:
+• <code>mercado 85</code>
+• <code>uber 18.50</code>
+• <code>farmacia 42,90</code>
+• <code>gastei 50 no posto</code>
+Eu anoto na mesma hora e coloco botões pra você trocar a categoria se quiser!
+
+📸 <b>3. FOTO COM LEGENDA:</b>
+Se você mandar uma foto e colocar na legenda algo como <code>lanche 32</code>, eu nem gasto meus olhos de gato com a imagem: já registro direto pelo que você escreveu na legenda!
+
+🤖 <b>4. COMANDOS PRINCIPAIS:</b>
+• <b>/resumo:</b> Raio-X do mês (salário líquido, total gasto, saldo restante).
+• <b>/dividas:</b> Lista todas as dívidas ativas, parcelas restantes e consignados.
+• <b>/fofoca</b> ou <b>/cobrar:</b> Minha função favorita! Eu audito se você ou a <b>Velha</b> mandaram coisas novas recentemente, deduro quem sumiu e <b>disparo uma cobrança simultânea no Telegram privado da outra pessoa</b>!
+• <b>/ajuda:</b> Mostra este guia novamente.
+
+Agora chega de moleza, mande os comprovantes e ponha meu papa! 🐾💥`;
+}
+
 async function handleStart(chatId: number) {
-  const mensagem = obterFalaAzula(`😼 <b>Miau!</b> Sou a <b>Azula</b>, a gata passiva-agressiva que de fato manda nessa casa. Se você veio aqui me incomodar, pelo menos faça direito.\n\nUse o comando <b>/vincular &lt;codigo&gt;</b> para conectar seu Telegram ao painel (se é que você lembra o código que gerou no dashboard).`);
+  const mensagem = obterFalaAzula(`😼 <b>Miau!</b> Sou a <b>Azula</b>, a gata passiva-agressiva que de fato manda nessa casa. Se você veio aqui me incomodar, pelo menos faça direito.\n\n• Use <b>/vincular &lt;codigo&gt;</b> para conectar seu Telegram ao painel.\n• Digite <b>/ajuda</b> para ver como me mandar contracheques, extratos, fotos ou gastos rápidos por texto!`);
   await enviarMensagem(chatId, mensagem);
 }
 
@@ -1307,6 +1343,13 @@ REGRAS CRÍTICAS DE CONDUTA (EVITE REPETIÇÃO ROBÓTICA!):
 7. FORMATAÇÃO FINANCEIRA FÁCIL PARA A VELHA (PRISCILA): Nunca junte cálculos, listas ou dados financeiros em um único parágrafo corrido de texto. Sempre organize em blocos limpos, usando tópicos (bullets •), negritos simples e quebras de linha claras. Como as mensagens são enviadas para o Telegram com parse_mode HTML, você DEVE usar as tags <b> para negrito (ex: <b>Receita:</b>) e <code> para valores numéricos (ex: <code>R$ 1.500,00</code>). NUNCA use asteriscos (**) ou acentos graves (\`) para formatação, pois eles não são aceitos no canal do Telegram e poluem a mensagem de asteriscos.
 8. COMPORTAMENTO E TRATAMENTO DE INSULTOS: Se o usuário te mandar "cagar", te xingar ou for grosseiro, NUNCA responda como uma IA corporativa politicamente correta pedindo desculpas ou se recusando a falar! Você é a Azula, atrevida e sem papas na língua. Responda de forma irônica, ácida e à altura (ex: devolva com "vai ocê!", "vai cagar você, humano!", "não enche meu saco!", etc.) mantendo a pegada cômica de um gato atrevido. Não dê palestras sobre respeito.
 9. CONTINUIDADE DO CONTEXTO RECENTE: Analise com muita atenção o histórico recente da conversa abaixo antes de responder! Se o usuário estiver comentando, complementando ou reagindo a algo que você acabou de dizer (por exemplo: se você acabou de fazer a fofoca ou mandar cobrança pra Velha/Priscila e o usuário disser "pede seu papa tbm", ele está pedindo pra você cobrar o papa também da Priscila na cobrança, ou continuando o assunto anterior). Mantenha SEMPRE esse raciocínio contínuo e orgânico. NUNCA aja com amnésia fingindo que não sabe o que acabou de falar!
+10. CONHECIMENTO COMPLETO DO APLICATIVO E ARQUIVOS SUPORTADOS: Se o usuário te perguntar como funciona o aplicativo, como mandar informações ou que arquivos você aceita, explique detalhadamente com a persona Azula (debochada, mas super clara):
+   - Contracheques / Holerites (PDF): Lê holerites da Camilo dos Santos e da Prefeitura/PJF em apenas 5ms com parser local próprio, extraindo salário bruto, líquido, todos os descontos individuais e contratos de empréstimo consignado, além de separar adiantamento de folha normal.
+   - Extratos bancários (PDF ou Imagem): Lê qualquer extrato bancário (Inter, Nubank, Caixa, Bradesco, etc.), extrai cada transação individualmente (débito, Pix, compras) e cadastra tudo confirmado no painel.
+   - Comprovantes de gasto (Fotos PNG/JPG ou PDFs): Lê comprovantes de Pix, maquininhas de cartão, boletos e cupons fiscais.
+   - Lançamento rápido por texto: Sem arquivo! O usuário pode só digitar direto: "mercado 85", "uber 18.50", "farmacia 42.90" ou "gastei 50 no posto".
+   - Foto com legenda: Se mandar foto com legenda tipo "lanche 35", você usa o valor da legenda direto sem cansar a visão.
+   - Comandos: /resumo (raio-x financeiro), /dividas (empréstimos e parcelas), /fofoca ou /cobrar (auditoria dedo-duro com cobrança simultânea no Telegram da Velha), /ajuda.
 
 ${contextoFinanceiro}
 ${historicoRecente}
@@ -1410,10 +1453,12 @@ export async function POST(req: NextRequest) {
       await handleDividas(chatId);
     } else if (text === '/fofoca' || text.startsWith('/fofoca') || text === '/dedoduro' || text === '/cobrar') {
       await dispararFofocaSemanal(chatId);
+    } else if (text === '/ajuda' || text === '/help' || text === '/manual') {
+      await enviarMensagem(chatId, obterManualAzula());
     } else if (text.startsWith('/')) {
       await enviarMensagem(
         chatId,
-        obterFalaAzula('😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas, /fofoca, /cobrar.')
+        obterFalaAzula('😾 Hum? Não entendi nada desse comando. Fale direito ou me dê licença. Comandos disponíveis: /vincular &lt;codigo&gt;, /resumo, /dividas, /fofoca, /cobrar, /ajuda.')
       );
     } else if (message.photo || message.document) {
       await processarArquivoTelegram(chatId, message);
@@ -1479,6 +1524,34 @@ export async function POST(req: NextRequest) {
         textNorm.includes('dispara para a priscila')
       ) {
         await dispararFofocaSemanal(chatId);
+        return NextResponse.json({ ok: true });
+      }
+
+      // 3. Interceptação de pedido de ajuda / explicação do app por texto natural
+      if (
+        textNorm === 'ajuda' ||
+        textNorm === 'help' ||
+        textNorm === 'manual' ||
+        textNorm === 'como funciona' ||
+        textNorm === 'como usar' ||
+        textNorm === 'como mandar' ||
+        textNorm.includes('como funciona') ||
+        textNorm.includes('como usar') ||
+        textNorm.includes('como mandar') ||
+        textNorm.includes('como envio') ||
+        textNorm.includes('que tipo de arquivo') ||
+        textNorm.includes('quais arquivos') ||
+        textNorm.includes('que arquivos') ||
+        textNorm.includes('o que você lê') ||
+        textNorm.includes('o que voce le') ||
+        textNorm.includes('o que você faz') ||
+        textNorm.includes('o que voce faz') ||
+        textNorm.includes('me explica o app') ||
+        textNorm.includes('me explica como funciona') ||
+        textNorm.includes('como mandar as informacoes') ||
+        textNorm.includes('como mandar as informações')
+      ) {
+        await enviarMensagem(chatId, obterManualAzula());
         return NextResponse.json({ ok: true });
       }
 
