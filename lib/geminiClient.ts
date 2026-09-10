@@ -77,6 +77,32 @@ Formato do JSON de retorno esperado:
   "data": "YYYY-MM-DD"
 }`;
 
+function parseJSONSeguro(texto: string, model: string): any {
+  let cleaned = texto.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  const inicio = cleaned.indexOf('{');
+  const fim = cleaned.lastIndexOf('}');
+  let jsonStr = cleaned;
+  if (inicio !== -1 && fim !== -1 && fim > inicio) {
+    jsonStr = cleaned.substring(inicio, fim + 1);
+  } else {
+    jsonStr = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  }
+
+  try {
+    return JSON.parse(jsonStr);
+  } catch (e1: any) {
+    try {
+      // Remove trailing commas antes de fechamento de chaves ou colchetes e caracteres de controle
+      const sanitized = jsonStr
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*]/g, ']');
+      return JSON.parse(sanitized);
+    } catch (e2: any) {
+      throw new Error(`Falha ao decodificar JSON (Modelo: ${model}, Resposta: "${jsonStr.substring(0, 150)}..."): ${e1.message}`);
+    }
+  }
+}
+
 async function extrairComGroq(base64: string, mimeType: string, prompt: string, isTextOnly: boolean): Promise<any> {
   const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
   if (!GROQ_API_KEY) {
@@ -115,7 +141,10 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
         messages.push({
           role: 'user',
           content: [
-            { type: 'text', text: prompt },
+            { 
+              type: 'text', 
+              text: `ATENÇÃO: Sua resposta deve ser ESTRITAMENTE um objeto JSON válido, sem texto introdutório, sem markdown e sem blocos de pensamento. Inicie diretamente com "{" e termine com "}".\n\n${prompt}` 
+            },
             {
               type: 'image_url',
               image_url: {
@@ -126,19 +155,25 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
         });
       } else {
         messages.push({
+          role: 'system',
+          content: 'Você é um extrator de dados financeiros de alta precisão. Responda ESTRITAMENTE com um objeto JSON válido iniciando com "{" e terminando com "}". Não inclua nenhuma saudação, comentário, explicação, bloco markdown ou texto fora do JSON.'
+        });
+        messages.push({
           role: 'user',
           content: prompt
         });
       }
 
+      // Modelos como qwen3.8 no tier on-demand possuem limite estrito de 1000 OTPM
+      const maxTokens = model.includes('qwen3.8') ? 950 : 3500;
+
       payload = {
         model: model,
         messages: messages,
         temperature: 0.1,
-        response_format: { type: 'json_object' }
+        max_tokens: maxTokens
       };
 
-      // Modelos de raciocínio da OpenAI/Groq (GPT-OSS) exigem reasoning_format hidden com JSON Mode
       if (model.includes('gpt-oss')) {
         payload.reasoning_format = 'hidden';
       }
@@ -151,27 +186,12 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
             'Authorization': `Bearer ${GROQ_API_KEY}`,
             'Content-Type': 'application/json'
           },
-          timeout: 12000
+          timeout: 15000
         }
       );
 
-      let textContent = response.data.choices?.[0]?.message?.content || '';
-      // Remove eventuais tags <think>...</think> do modelo
-      textContent = textContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-      const inicio = textContent.indexOf('{');
-      const fim = textContent.lastIndexOf('}');
-      let jsonStr = textContent;
-      if (inicio !== -1 && fim !== -1 && fim > inicio) {
-        jsonStr = textContent.substring(inicio, fim + 1);
-      } else {
-        jsonStr = textContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      }
-      try {
-        return JSON.parse(jsonStr);
-      } catch (parseErr: any) {
-        throw new Error(`Falha ao decodificar JSON (Modelo: ${model}, Resposta: "${jsonStr.substring(0, 120)}..."): ${parseErr.message}`);
-      }
+      const textContent = response.data.choices?.[0]?.message?.content || '';
+      return parseJSONSeguro(textContent, model);
     } catch (err: any) {
       const status = err.response?.status;
       const errMsg = err.response?.data?.error?.message || err.message;
@@ -202,24 +222,11 @@ async function extrairComGroq(base64: string, mimeType: string, prompt: string, 
                   'Authorization': `Bearer ${GROQ_API_KEY}`,
                   'Content-Type': 'application/json'
                 },
-                timeout: 12000
+                timeout: 15000
               }
             );
-            let textContentRetry = responseRetry.data.choices?.[0]?.message?.content || '';
-            textContentRetry = textContentRetry.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-            const inicioRetry = textContentRetry.indexOf('{');
-            const fimRetry = textContentRetry.lastIndexOf('}');
-            let jsonStrRetry = textContentRetry;
-            if (inicioRetry !== -1 && fimRetry !== -1 && fimRetry > inicioRetry) {
-              jsonStrRetry = textContentRetry.substring(inicioRetry, fimRetry + 1);
-            } else {
-              jsonStrRetry = textContentRetry.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            }
-            try {
-              return JSON.parse(jsonStrRetry);
-            } catch (parseErr: any) {
-              throw new Error(`Falha ao decodificar JSON no Retry (Modelo: ${model}, Resposta: "${jsonStrRetry.substring(0, 120)}..."): ${parseErr.message}`);
-            }
+            const textContentRetry = responseRetry.data.choices?.[0]?.message?.content || '';
+            return parseJSONSeguro(textContentRetry, model);
           } catch (retryErr: any) {
             err = retryErr;
           }

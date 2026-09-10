@@ -9,6 +9,9 @@ import path from 'path';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || '';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_WEBHOOK_SECRET) {
   console.warn('Telegram env vars not set');
 }

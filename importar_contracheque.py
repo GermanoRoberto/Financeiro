@@ -95,13 +95,15 @@ Formato do JSON esperado:
     last_err = None
 
     for model in candidates:
+        max_tokens = 950 if "qwen3.8" in model else 3500
         payload = {
             "model": model,
             "messages": [
+                {"role": "system", "content": "Você é um extrator de dados de alta precisão. Responda ESTRITAMENTE com um objeto JSON válido iniciando com { e terminando com }."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.1,
-            "response_format": {"type": "json_object"}
+            "max_tokens": max_tokens
         }
         if "gpt-oss" in model:
             payload["reasoning_format"] = "hidden"
@@ -115,7 +117,15 @@ Formato do JSON esperado:
             conteudo = res_data['choices'][0]['message']['content'] or ""
             import re
             conteudo = re.sub(r'<think>[\s\S]*?</think>', '', conteudo).strip()
-            return json.loads(conteudo)
+            inicio = conteudo.find('{')
+            fim = conteudo.rfind('}')
+            if inicio != -1 and fim != -1 and fim > inicio:
+                conteudo = conteudo[inicio:fim+1]
+            try:
+                return json.loads(conteudo)
+            except Exception:
+                conteudo_limpo = re.sub(r',\s*([}\]])', r'\1', conteudo)
+                return json.loads(conteudo_limpo)
         except Exception as e:
             print(f"⚠️ Modelo {model} falhou: {e}. Tentando próximo...")
             last_err = e
