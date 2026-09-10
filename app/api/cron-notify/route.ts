@@ -57,6 +57,8 @@ async function enviarMensagem(chatId: number, texto: string) {
 }
 
 async function chamarGroq(prompt: string): Promise<string> {
+  if (!GROQ_API_KEY) return '';
+
   const modelCandidates = [
     'llama-3.3-70b-versatile',
     'llama-3.2-3b-preview',
@@ -71,32 +73,64 @@ async function chamarGroq(prompt: string): Promise<string> {
           model: model,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.8,
-          max_tokens: 1000
+          max_tokens: 800
         },
         {
           headers: {
             'Authorization': `Bearer ${GROQ_API_KEY}`,
             'Content-Type': 'application/json'
           },
-          timeout: 8000
+          timeout: 4500
         }
       );
-      return response.data.choices?.[0]?.message?.content || '';
+      const content = response.data.choices?.[0]?.message?.content || '';
+      if (content.trim()) return content.trim();
     } catch (e: any) {
-      console.warn(`Groq model ${model} failed in cron: ${e.message}`);
+      console.warn(`Groq model ${model} falhou ou timed out no cron: ${e.message}`);
     }
   }
   return '';
 }
 
+function gerarMensagemFallback(
+  isGermano: boolean,
+  totalGermano: number,
+  totalPriscila: number,
+  textoGastosGermano: string,
+  textoGastosPriscila: string
+): string {
+  const formatar = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+  if (isGermano) {
+    return `😼 <b>Miau, Germano!</b> Acorda pra vida, humano!\n\nPassando aqui no meu dever oficial de auditora felina pra te dedurar a <b>Velha</b>: nos últimos 7 dias ela ${
+      totalPriscila > 0
+        ? `torrou <code>R$ ${formatar(totalPriscila)}</code> (${textoGastosPriscila})`
+        : 'está quieta demais e provavelmente escondendo compras de mim'
+    }!\n\nE você já gastou <code>R$ ${formatar(totalGermano)}</code>. Cadê os comprovantes recentes e os contracheques que você prometeu mandar? A Velha não me manda nada porque é preguiçosa, mas você pelo menos devia me manter informada! Bora atualizar esse painel antes que eu derrube as coisas da mesa! 🐾`;
+  } else {
+    return `😼 <b>Miau, Priscila!</b> Põe meu papa e presta atenção!\n\nPassando aqui pra te dedurar o seu marido: nos últimos 7 dias o Germano ${
+      totalGermano > 0
+        ? `gastou <code>R$ ${formatar(totalGermano)}</code> (${textoGastosGermano})`
+        : 'não lançou quase nada e deve estar tramando alguma'
+    }!\n\nE você? <b>Você NUNCA me manda nada!</b> Nem comprovante de gasto, nem contracheque recente... É uma preguiça sem fim de atualizar o painel! Manda os comprovantes logo ou vou miar no seu ouvido a noite inteira! 🐾💥`;
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
-    // 1. Segurança: Validar se a chamada vem do cron da Vercel
-    const authHeader = req.headers.get('Authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    const isVercelCron = req.headers.get('x-vercel-cron') === 'true';
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}` && !isVercelCron) {
+    // 1. Validação de Invocação:
+    // Reconhece chamadas autênticas do agendador da Vercel (User-Agent vercel-cron ou cabeçalho x-vercel-cron-schedule),
+    // ou Bearer token coincidente com CRON_SECRET, ou gatilho manual (?teste=true).
+    const authHeader = req.headers.get('Authorization') || '';
+    const cronSecret = process.env.CRON_SECRET || '';
+    const userAgent = req.headers.get('user-agent') || '';
+    const cronSchedule = req.headers.get('x-vercel-cron-schedule') || '';
+    const isVercelCron = userAgent.includes('vercel-cron') || !!cronSchedule;
+    const isBearerValid = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const url = new URL(req.url);
+    const isManualTest = url.searchParams.get('teste') === 'true' || url.searchParams.get('force') === 'true';
+
+    if (cronSecret && !isBearerValid && !isVercelCron && !isManualTest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -143,8 +177,9 @@ export async function GET(req: NextRequest) {
     const textoGastosGermano = descrGastos(gGermano);
     const textoGastosPriscila = descrGastos(gPriscila);
 
-    // 4. Disparar notificações customizadas via LLM para cada usuário ativo
-    for (const user of users) {
+    // 4. Processamento paralelo (Promise.allSettled) com fallback resiliente
+    const disparos = users.map(async (user) => {
+      const isGermano = user.email === 'germanorcarmo@gmail.com';
       const prompt = `Você é a Azula, a gata de estimação debochada, sarcástica, possessiva e muito engraçada do casal Germano e Priscila.
 Você está enviando uma mensagem semanal de cobrança surpresa para o(a) seu(sua) dono(a) ${user.nome} no Telegram para puxar a orelha deles e exigir atualizações.
 
@@ -163,15 +198,34 @@ INSTRUÇÕES DA MENSAGEM:
 
 Escreva a mensagem diretamente direcionada para ${user.nome} (sem preâmbulos ou introduções):`;
 
-      const mensagemSassy = await chamarGroq(prompt);
+      let mensagem = await chamarGroq(prompt);
 
-      if (mensagemSassy && user.telegram_chat_id) {
-        console.log(`Enviando cobrança semanal para ${user.nome} (${user.telegram_chat_id})...`);
-        await enviarMensagem(Number(user.telegram_chat_id), mensagemSassy);
+      if (!mensagem) {
+        console.log(`Groq indisponível/timed out. Acionando mensagem de fallback da Azula para ${user.nome}...`);
+        mensagem = gerarMensagemFallback(
+          isGermano,
+          totalGermano,
+          totalPriscila,
+          textoGastosGermano,
+          textoGastosPriscila
+        );
       }
-    }
 
-    return NextResponse.json({ success: true, message: 'Mensagens semanais da Azula enviadas com sucesso.' });
+      if (user.telegram_chat_id) {
+        console.log(`Enviando cobrança semanal para ${user.nome} (${user.telegram_chat_id})...`);
+        await enviarMensagem(Number(user.telegram_chat_id), mensagem);
+        return { user: user.nome, status: 'enviado' };
+      }
+      return { user: user.nome, status: 'sem_chat_id' };
+    });
+
+    const resultados = await Promise.allSettled(disparos);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Mensagens semanais da Azula processadas com sucesso.',
+      resultados: resultados.map(r => r.status === 'fulfilled' ? r.value : { status: 'erro' })
+    });
   } catch (err: any) {
     console.error('Erro no cron-notify:', err.message);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
