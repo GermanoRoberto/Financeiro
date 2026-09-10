@@ -1018,7 +1018,7 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
       const isReceita = extracao.categoria === 'receita_extra';
       const isTransf = extracao.categoria === 'transferencia';
 
-      // Salvar gasto diário como não confirmado
+      // Salvar gasto diário já confirmado automaticamente (zero atrito)
       const { data: gasto, error: errGasto } = await supabase
         .from('gastos_diarios')
         .insert({
@@ -1028,7 +1028,7 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
           categoria: extracao.categoria || 'outros',
           data: extracao.data || new Date().toISOString().substring(0, 10),
           origem: 'telegram',
-          confirmado: false,
+          confirmado: true,
         })
         .select()
         .single();
@@ -1037,24 +1037,25 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
         throw new Error('Erro ao salvar gasto diário: ' + (errGasto?.message || 'Sem dados de retorno'));
       }
 
+      const valorFormatado = (extracao.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
       if (isReceita) {
-        const msgText = obterFalaAzula(`😼 Identifiquei uma receita extra de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> vinda de <b>${extracao.estabelecimento}</b>.\n\nConfirmar essa entrada de dinheiro para mim?`);
+        const msgText = obterFalaAzula(`😼 Registrei sua receita extra de <b>R$ ${valorFormatado}</b> vinda de <b>${extracao.estabelecimento}</b>!`);
         await enviarMensagemComBotoes(chatId, msgText, [
           [
-            { text: '✅ Confirmar Receita', callback_data: `cat_receitaextra_${gasto.id}` },
-            { text: '❌ Excluir', callback_data: `del_${gasto.id}` }
+            { text: '❌ Excluir Receita', callback_data: `del_${gasto.id}` }
           ]
         ]);
       } else if (isTransf) {
-        const msgText = obterFalaAzula(`😼 Identifiquei uma transferência de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> com destino a <b>${extracao.estabelecimento}</b>.\n\nConfirmar essa transferência?`);
+        const msgText = obterFalaAzula(`😼 Registrei sua transferência de <b>R$ ${valorFormatado}</b> para <b>${extracao.estabelecimento}</b>!`);
         await enviarMensagemComBotoes(chatId, msgText, [
           [
-            { text: '✅ Confirmar Transferência', callback_data: `cat_transferencia_${gasto.id}` },
-            { text: '❌ Excluir', callback_data: `del_${gasto.id}` }
+            { text: '❌ Excluir Transferência', callback_data: `del_${gasto.id}` }
           ]
         ]);
       } else {
-        const msgText = obterFalaAzula(`😼 Identifiquei um gasto de <b>R$ ${extracao.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b> no estabelecimento <b>${extracao.estabelecimento}</b>.\n\nEsse gasto foi do quê, meu chapa? Escolha a categoria abaixo para eu registrar:`);
+        const catNome = extracao.categoria || 'outros';
+        const msgText = obterFalaAzula(`😼 Já anotei e confirmei! Registrei seu gasto de <b>R$ ${valorFormatado}</b> no(a) <b>${extracao.estabelecimento}</b> como <b>${catNome}</b>. Menos dinheiro pra torrar agora!`);
         await enviarMensagemComBotoes(chatId, msgText, botoesCategorias(gasto.id));
       }
     } else {
