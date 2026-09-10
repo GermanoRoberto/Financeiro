@@ -3,7 +3,7 @@ import axios from 'axios';
 import { adicionarAoHistorico } from '@/lib/chatHistory';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 export function escaparHTMLTelegram(texto: string): string {
   let temp = texto.replace(/&(?!(amp|lt|gt);)/g, '&amp;');

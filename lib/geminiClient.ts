@@ -152,7 +152,7 @@ function parseJSONSeguro(texto: string, model: string): any {
 }
 
 async function extrairComGroq(base64: string, mimeType: string, prompt: string, isTextOnly: boolean): Promise<any> {
-  const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
+  const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
   if (!GROQ_API_KEY) {
     throw new Error('GROQ_API_KEY não configurada na Vercel.');
   }
@@ -856,7 +856,7 @@ function parseContrachequePjfLocal(text: string): any {
 }
 
 async function extrairComGeminiPDF(base64: string, prompt: string): Promise<any> {
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
   if (!GEMINI_API_KEY) {
     throw new Error('Chave do Gemini não configurada localmente ou na Vercel.');
   }

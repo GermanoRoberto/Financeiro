@@ -1,5 +1,7 @@
 'use client';
 
+import { round2, somarValores } from '@/lib/money';
+
 interface DescontoEmp {
   id: string;
   tipo: string;
@@ -45,21 +47,25 @@ export default function PainelEmprestimos({ descontos, dividas, visao: _visao }:
     (d) => d.parcelas_restantes && d.parcelas_restantes > 0
   );
 
-  // Calcular totais
-  const totalContrachequeRestante = emprestimosContracheque.reduce((acc, d) => {
-    const temParcelas = d.parcela_total !== null && d.parcela_total > 0;
-    const atual = d.parcela_atual || 1;
-    const total = d.parcela_total || 1;
-    const restantes = temParcelas ? (total - atual + 1) : 1;
-    return acc + d.valor * restantes;
-  }, 0);
+  // Calcular totais com precisão centesimal
+  const totalContrachequeRestante = somarValores(
+    emprestimosContracheque.map((d) => {
+      const temParcelas = d.parcela_total !== null && d.parcela_total > 0;
+      const atual = d.parcela_atual || 1;
+      const total = d.parcela_total || 1;
+      const restantes = temParcelas ? (total - atual + 1) : 1;
+      return round2(d.valor * restantes);
+    })
+  );
 
-  const totalDividasRestante = dividasParceladas.reduce((acc, d) => {
-    const parcelas = d.parcelas_restantes || 0;
-    return acc + d.valor_parcela * parcelas;
-  }, 0);
+  const totalDividasRestante = somarValores(
+    dividasParceladas.map((d) => {
+      const parcelas = d.parcelas_restantes || 0;
+      return round2(d.valor_parcela * parcelas);
+    })
+  );
 
-  const totalGeralRestante = totalContrachequeRestante + totalDividasRestante;
+  const totalGeralRestante = somarValores([totalContrachequeRestante, totalDividasRestante]);
 
   return (
     <div className="space-y-6">
@@ -111,75 +117,137 @@ export default function PainelEmprestimos({ descontos, dividas, visao: _visao }:
         {emprestimosContracheque.length === 0 ? (
           <p className="text-slate-400 text-sm">Nenhum empréstimo consignado ativo localizado.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-wider">
-                  <th className="pb-3 font-semibold">Dono</th>
-                  <th className="pb-3 font-semibold">Credor/Contrato</th>
-                  <th className="pb-3 font-semibold">Parcela Mensal</th>
-                  <th className="pb-3 font-semibold text-center">Progresso</th>
-                  <th className="pb-3 font-semibold text-right">Saldo Devedor</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                {emprestimosContracheque.map((emp) => {
-                  const temParcelas = emp.parcela_total !== null && emp.parcela_total > 0;
-                  const atual = emp.parcela_atual || 1;
-                  const total = emp.parcela_total || 1;
-                  const restantes = temParcelas ? (total - atual + 1) : 1;
-                  const saldoDevedor = emp.valor * restantes;
-                  const percent = temParcelas ? Math.min(100, Math.round((atual / total) * 100)) : 0;
+          <>
+            {/* Lista Mobile (Cards com touch target >= 44px) */}
+            <div className="block md:hidden space-y-3">
+              {emprestimosContracheque.map((emp) => {
+                const temParcelas = emp.parcela_total !== null && emp.parcela_total > 0;
+                const atual = emp.parcela_atual || 1;
+                const total = emp.parcela_total || 1;
+                const restantes = temParcelas ? (total - atual + 1) : 1;
+                const saldoDevedor = round2(emp.valor * restantes);
+                const percent = temParcelas ? Math.min(100, Math.round((atual / total) * 100)) : 0;
 
-                  return (
-                    <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-xxs font-bold uppercase ${
-                          emp.usuario_nome === 'Germano' 
-                            ? 'bg-blue-50 text-blue-600' 
-                            : 'bg-pink-50 text-pink-600'
-                        }`}>
-                          {emp.usuario_nome}
-                        </span>
-                      </td>
-                      <td className="py-4 font-medium text-slate-800">
-                        {emp.tipo}
-                      </td>
-                      <td className="py-4 text-slate-600">
-                        R$ {emp.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-4">
-                        {temParcelas ? (
-                          <div className="flex flex-col items-center justify-center gap-1 min-w-[120px]">
-                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${
-                                  emp.usuario_nome === 'Germano' ? 'bg-blue-500' : 'bg-pink-500'
-                                }`} 
-                                style={{ width: `${percent}%` }}
-                              />
+                return (
+                  <div key={`m-${emp.id}`} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2.5 py-1 rounded-full text-xxs font-bold uppercase tracking-wide ${
+                        emp.usuario_nome === 'Germano' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'bg-pink-100 text-pink-700'
+                      }`}>
+                        {emp.usuario_nome}
+                      </span>
+                      <span className="text-sm font-bold text-slate-800">
+                        {temParcelas ? `R$ ${saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'Sob consulta'}
+                      </span>
+                    </div>
+
+                    <div className="font-semibold text-slate-800 text-sm leading-snug">
+                      {emp.tipo}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                      <span>Parcela mensal:</span>
+                      <span className="font-bold text-slate-700">R$ {emp.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    {temParcelas ? (
+                      <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1.5">
+                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              emp.usuario_nome === 'Germano' ? 'bg-blue-500' : 'bg-pink-500'
+                            }`} 
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xxs text-slate-400 font-medium">
+                          <span>{atual} de {total} parcelas</span>
+                          <span>{percent}% quitado</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="pt-1 text-xxs text-slate-400 italic">
+                        Desconto mensal fixo / Sob consulta
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tabela Desktop */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                    <th className="pb-3 font-semibold">Dono</th>
+                    <th className="pb-3 font-semibold">Credor/Contrato</th>
+                    <th className="pb-3 font-semibold">Parcela Mensal</th>
+                    <th className="pb-3 font-semibold text-center">Progresso</th>
+                    <th className="pb-3 font-semibold text-right">Saldo Devedor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
+                  {emprestimosContracheque.map((emp) => {
+                    const temParcelas = emp.parcela_total !== null && emp.parcela_total > 0;
+                    const atual = emp.parcela_atual || 1;
+                    const total = emp.parcela_total || 1;
+                    const restantes = temParcelas ? (total - atual + 1) : 1;
+                    const saldoDevedor = round2(emp.valor * restantes);
+                    const percent = temParcelas ? Math.min(100, Math.round((atual / total) * 100)) : 0;
+
+                    return (
+                      <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4">
+                          <span className={`px-2 py-0.5 rounded-full text-xxs font-bold uppercase ${
+                            emp.usuario_nome === 'Germano' 
+                              ? 'bg-blue-50 text-blue-600' 
+                              : 'bg-pink-50 text-pink-600'
+                          }`}>
+                            {emp.usuario_nome}
+                          </span>
+                        </td>
+                        <td className="py-4 font-medium text-slate-800">
+                          {emp.tipo}
+                        </td>
+                        <td className="py-4 text-slate-600">
+                          R$ {emp.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-4">
+                          {temParcelas ? (
+                            <div className="flex flex-col items-center justify-center gap-1 min-w-[120px]">
+                              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    emp.usuario_nome === 'Germano' ? 'bg-blue-500' : 'bg-pink-500'
+                                  }`} 
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                              <span className="text-slate-400 text-xxs font-semibold">
+                                {atual} de {total} parcelas ({percent}%)
+                              </span>
                             </div>
-                            <span className="text-slate-400 text-xxs font-semibold">
-                              {atual} de {total} parcelas ({percent}%)
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">Desconto mensal fixo / Sob consulta</span>
-                        )}
-                      </td>
-                      <td className="py-4 text-right font-bold text-slate-800">
-                        {temParcelas ? (
-                          `R$ ${saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                        ) : (
-                          <span className="text-slate-400 font-normal italic">Sob consulta</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Desconto mensal fixo / Sob consulta</span>
+                          )}
+                        </td>
+                        <td className="py-4 text-right font-bold text-slate-800">
+                          {temParcelas ? (
+                            `R$ ${saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          ) : (
+                            <span className="text-slate-400 font-normal italic">Sob consulta</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -192,54 +260,99 @@ export default function PainelEmprestimos({ descontos, dividas, visao: _visao }:
         {dividasParceladas.length === 0 ? (
           <p className="text-slate-400 text-sm">Nenhum parcelamento externo ativo localizado.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-wider">
-                  <th className="pb-3 font-semibold">Dono</th>
-                  <th className="pb-3 font-semibold">Credor / Cartão</th>
-                  <th className="pb-3 font-semibold">Valor da Parcela</th>
-                  <th className="pb-3 font-semibold text-center">Restantes</th>
-                  <th className="pb-3 font-semibold text-right">Saldo Devedor</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                {dividasParceladas.map((div) => {
-                  const restantes = div.parcelas_restantes || 0;
-                  const saldoDevedor = div.valor_parcela * restantes;
+          <>
+            {/* Lista Mobile (Cards com touch target >= 44px) */}
+            <div className="block md:hidden space-y-3">
+              {dividasParceladas.map((div) => {
+                const restantes = div.parcelas_restantes || 0;
+                const saldoDevedor = round2(div.valor_parcela * restantes);
 
-                  return (
-                    <tr key={div.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-xxs font-bold uppercase ${
-                          div.usuario_nome === 'Conjunta'
-                            ? 'bg-purple-50 text-purple-600'
-                            : div.usuario_nome === 'Germano'
-                              ? 'bg-blue-50 text-blue-600'
-                              : 'bg-pink-50 text-pink-600'
-                        }`}>
-                          {div.usuario_nome}
-                        </span>
-                      </td>
-                      <td className="py-4 font-medium text-slate-800">
-                        {div.credor}
-                      </td>
-                      <td className="py-4 text-slate-600">
-                        R$ {div.valor_parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-4 text-center font-semibold text-slate-500">
-                        {restantes} meses
-                      </td>
-                      <td className="py-4 text-right font-bold text-slate-800">
+                return (
+                  <div key={`m-${div.id}`} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2.5 py-1 rounded-full text-xxs font-bold uppercase tracking-wide ${
+                        div.usuario_nome === 'Conjunta'
+                          ? 'bg-purple-100 text-purple-700'
+                          : div.usuario_nome === 'Germano'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-pink-100 text-pink-700'
+                      }`}>
+                        {div.usuario_nome}
+                      </span>
+                      <span className="text-sm font-bold text-slate-800">
                         R$ {saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                    </div>
+
+                    <div className="font-semibold text-slate-800 text-sm leading-snug">
+                      {div.credor}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                      <span>Valor da parcela:</span>
+                      <span className="font-bold text-slate-700">R$ {div.valor_parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Parcelas restantes:</span>
+                      <span className="font-semibold text-slate-700">{restantes} {restantes === 1 ? 'mês' : 'meses'}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tabela Desktop */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                    <th className="pb-3 font-semibold">Dono</th>
+                    <th className="pb-3 font-semibold">Credor / Cartão</th>
+                    <th className="pb-3 font-semibold">Valor da Parcela</th>
+                    <th className="pb-3 font-semibold text-center">Restantes</th>
+                    <th className="pb-3 font-semibold text-right">Saldo Devedor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
+                  {dividasParceladas.map((div) => {
+                    const restantes = div.parcelas_restantes || 0;
+                    const saldoDevedor = round2(div.valor_parcela * restantes);
+
+                    return (
+                      <tr key={div.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4">
+                          <span className={`px-2 py-0.5 rounded-full text-xxs font-bold uppercase ${
+                            div.usuario_nome === 'Conjunta'
+                              ? 'bg-purple-50 text-purple-600'
+                              : div.usuario_nome === 'Germano'
+                                ? 'bg-blue-50 text-blue-600'
+                                : 'bg-pink-50 text-pink-600'
+                          }`}>
+                            {div.usuario_nome}
+                          </span>
+                        </td>
+                        <td className="py-4 font-medium text-slate-800">
+                          {div.credor}
+                        </td>
+                        <td className="py-4 text-slate-600">
+                          R$ {div.valor_parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-4 text-center font-semibold text-slate-500">
+                          {restantes} meses
+                        </td>
+                        <td className="py-4 text-right font-bold text-slate-800">
+                          R$ {saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
+
       </div>
     </div>
   );

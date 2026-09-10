@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Usuario, Contracheque, Desconto, Divida, GastoDiario } from '@/lib/types';
 import { logout } from '@/lib/auth';
 import { projetarDescontos, calcularComprometimento } from '@/lib/projecao';
+import { somarValores } from '@/lib/money';
 import DashboardHeader from '@/components/DashboardHeader';
 import ResumoCard from '@/components/ResumoCard';
 import SeletorVisao from '@/components/SeletorVisao';
@@ -78,7 +79,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
         .select('*')
         .neq('id', usuario.id)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (usuariosData) {
         setUsuarioEsposa(usuariosData);
@@ -105,8 +106,8 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     (c) => c.mes_referencia === ultimoMes
   );
 
-  const salarioBruto = contrachequesMesAtual.reduce((acc, c) => acc + (c.salario_bruto || 0), 0);
-  const salarioLiquido = contrachequesMesAtual.reduce((acc, c) => acc + (c.salario_liquido || 0), 0);
+  const salarioBruto = somarValores(contrachequesMesAtual.map((c) => c.salario_bruto || 0));
+  const salarioLiquido = somarValores(contrachequesMesAtual.map((c) => c.salario_liquido || 0));
 
   // Filtrar descontos conforme a visão
   const descontosAtivos = descontos.filter((d: any) => {
@@ -155,7 +156,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     }
   }, [_gastos, gastosFiltrados, visao, verTodasTransacoes, usuario.id, usuarioEsposa]);
 
-  const totalDescontos = descontosAtivos.reduce((acc, d) => acc + (d.valor || 0), 0);
+  const totalDescontos = somarValores(descontosAtivos.map((d: any) => d.valor || 0));
   const comprometimento = calcularComprometimento(totalDescontos, salarioBruto);
 
   const projecao = projetarDescontos(descontosAtivos, dividasAba, salarioBruto, 12);

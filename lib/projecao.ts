@@ -1,5 +1,6 @@
 import { Desconto, Divida } from './types';
 import { addMonths, startOfMonth } from 'date-fns';
+import { round2, somarValores } from './money';
 
 export interface ProjecaoMes {
   mes: Date;
@@ -92,13 +93,13 @@ export function projetarDescontos(
       return d.parcelas_restantes > i;
     }).map((d) => ({
       ...d,
-      parcelas_restantes: d.parcelas_restantes - i
+      parcelas_restantes: Math.max(0, d.parcelas_restantes - i)
     }));
 
-    const totalDescontos = descontosDoMes.reduce((acc, d) => acc + (d.valor || 0), 0);
-    const totalDividasTabela = dividasDoMes.reduce((acc, d) => acc + (d.valor_parcela || 0), 0);
-    const totalDividasHolerite = descontosEmprestimoComoDivida.reduce((acc, d) => acc + (d.valor || 0), 0);
-    const totalDividas = totalDividasTabela + totalDividasHolerite;
+    const totalDescontos = somarValores(descontosDoMes.map((d) => d.valor || 0));
+    const totalDividasTabela = somarValores(dividasDoMes.map((d) => d.valor_parcela || 0));
+    const totalDividasHolerite = somarValores(descontosEmprestimoComoDivida.map((d) => d.valor || 0));
+    const totalDividas = somarValores([totalDividasTabela, totalDividasHolerite]);
 
     // Criar representações virtuais para empréstimos em folha não detalhados (ex: Priscila)
     // Reduzindo as parcelas restantes virtuais também
@@ -110,8 +111,8 @@ export function projetarDescontos(
         id: d.id,
         usuario_id: (d as any).contracheque?.usuario_id || null,
         credor: `Consignado em Folha: ${d.tipo}`,
-        valor_total: d.valor * restantesHoje,
-        valor_parcela: d.valor,
+        valor_total: round2(d.valor * restantesHoje),
+        valor_parcela: round2(d.valor),
         parcelas_restantes: Math.max(0, restantesHoje - i),
         vencimento_dia: 10,
         ativa: false,
@@ -126,7 +127,7 @@ export function projetarDescontos(
       dividas: [...dividasDoMes, ...dividasVirtuais],
       totalDescontos,
       totalDividas,
-      totalGeral: totalDescontos + totalDividas,
+      totalGeral: somarValores([totalDescontos, totalDividas]),
       salarioBruto: _salarioBruto,
     });
   }
@@ -139,5 +140,5 @@ export function calcularComprometimento(
   salarioBruto: number
 ): number {
   if (salarioBruto <= 0) return 0;
-  return (totalDescontos / salarioBruto) * 100;
+  return round2((totalDescontos / salarioBruto) * 100);
 }
