@@ -1189,20 +1189,34 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
       const totalGastos = (gastosMes || []).reduce((acc, g) => acc + g.valor, 0);
 
       // --- CALCULOS PARA ESTUDO DE CAMINHO ---
-      const totalDividasMensal = (divList || []).reduce((acc, d) => acc + (d.ativa ? d.valor_parcela : 0), 0);
-      let totalDescontosVal = 0;
+      const dividasAtivas = (divList || []).filter(d => d.ativa);
+      const totalDividasExternas = dividasAtivas.reduce((acc, d) => acc + d.valor_parcela, 0);
+
+      const consignadosTabela = (divList || []).filter(d => !d.ativa);
+      const totalConsignadosTabela = consignadosTabela.reduce((acc, d) => acc + d.valor_parcela, 0);
+
+      let totalEmprestimosFolha = 0;
       if (cc) {
         const { data: list } = await supabase
           .from('descontos')
-          .select('valor')
+          .select('tipo, valor')
           .eq('contracheque_id', cc.id);
         if (list) {
-          totalDescontosVal = list.reduce((acc, d) => acc + d.valor, 0);
+          totalEmprestimosFolha = list
+            .filter(d => {
+              const t = (d.tipo || '').toLowerCase();
+              return t.includes('empréstimo') || t.includes('consignado') || t.includes('cef') || t.includes('crédito trabalhador');
+            })
+            .reduce((acc, d) => acc + d.valor, 0);
         }
       }
-      
-      const fixas = totalDescontosVal + totalDividasMensal;
-      const receita = cc?.salario_liquido || 4500;
+
+      const diferencaNaoMapeadaFolha = Math.max(0, Math.round((totalEmprestimosFolha - totalConsignadosTabela) * 100) / 100);
+
+      // As despesas fixas a serem pagas da conta são as dívidas externas
+      // (pois os descontos de folha já foram abatidos na fonte antes do líquido cair na conta)
+      const fixas = totalDividasExternas;
+      const receita = cc?.salario_liquido || (usuario.nome.toLowerCase().includes('priscila') ? 3120.39 : 2356.22);
 
       // Buscar despesas variáveis nos últimos 30 dias
       const hoje = new Date();
@@ -1216,13 +1230,15 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
 
       const variaveis = (listGastos || [])
         .filter(g => g.categoria !== 'receita_extra' && g.categoria !== 'transferencia')
-        .reduce((acc, g) => acc + g.valor, 0) || 1800;
+        .reduce((acc, g) => acc + g.valor, 0) || (usuario.nome.toLowerCase().includes('priscila') ? 900 : 1800);
 
-      const sobraA = receita - fixas - (variaveis * 0.85);
-      const diasA = sobraA > 0 ? Math.ceil(1500 / sobraA) * 30 : 180;
+      const sobraReal = Math.round((receita - fixas - variaveis) * 100) / 100;
+      const sobraA = Math.round((receita - fixas - (variaveis * 0.85)) * 100) / 100;
+      const metaRecuperacao = Math.abs(sobraReal < 0 ? sobraReal * 3 : 1500);
+      const diasA = sobraA > 0 ? Math.ceil(metaRecuperacao / sobraA) * 30 : 180;
 
       const maiorDivida = (divList || []).reduce((max, d) => d.valor_parcela > max ? d.valor_parcela : max, 0);
-      let sB = -2500;
+      let sB = sobraReal < 0 ? sobraReal * 4 : -2500;
       let mesB = -1;
       for (let m = 1; m <= 12; m++) {
         let sobraB = receita - fixas - variaveis;
@@ -1263,7 +1279,15 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
                            textCleanCheck.includes("reestruturacao") ||
                            textCleanCheck.includes("caminho financeiro") ||
                            textCleanCheck.includes("recuperacao financeira") ||
-                           textCleanCheck.includes("reestruturar");
+                           textCleanCheck.includes("reestruturar") ||
+                           textCleanCheck.includes("saude financeira") ||
+                           textCleanCheck.includes("o que pode melhorar") ||
+                           textCleanCheck.includes("o que posso melhorar") ||
+                           textCleanCheck.includes("como posso melhorar") ||
+                           textCleanCheck.includes("como melhorar") ||
+                           textCleanCheck.includes("reduzir contas") ||
+                           textCleanCheck.includes("reducao de contas") ||
+                           textCleanCheck.includes("analise de reducao");
 
       contextoFinanceiro = `
 DADOS FINANCEIROS REAIS DO HUMANO (Use isso para fazer contas ou responder perguntas sobre dinheiro/empréstimos):
@@ -1279,30 +1303,46 @@ ${dividasTexto}
 
       if (pedirEstudo) {
         contextoFinanceiro += `
-⚠️ ATENÇÃO: O USUÁRIO SOLICITOU UM ESTUDO FINANCEIRO / DE CAMINHO.
+⚠️ ATENÇÃO: O USUÁRIO SOLICITOU UM ESTUDO FINANCEIRO / DE CAMINHO / SAÚDE FINANCEIRA.
 Você deve responder usando RIGOROSAMENTE este formato estruturado e visual com tags HTML, pois o canal do Telegram utiliza parse_mode: 'HTML':
 
 === TEMPLATE DE RESPOSTA ===
-😺 <b>AZULA | ESTUDO DE CAMINHO FINANCEIRO</b> 🐾
+😺 <b>AZULA | ESTUDO DE SAÚDE & CAMINHO FINANCEIRO</b> 🐾
 
-Humano, fiz as contas. Aqui está o seu raio-x financeiro atual e as duas alternativas mais viáveis:
+Humano, fiz as contas minuciosas no seu raio-x financeiro real:
 
-💰 <b>RAIO-X MENSAL ATUAL</b>
-•   <b>Receita Líquida:</b> <code>R$ ${formatarRealLocal(receita)}</code>
-•   <b>Despesas Fixas + Descontos:</b> <code>R$ ${formatarRealLocal(fixas)}</code>
-•   <b>Despesas Variáveis (Média):</b> <code>R$ ${formatarRealLocal(variaveis)}</code>
-•   <b>Saldo Livre:</b> <code>${receita - fixas - variaveis >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(receita - fixas - variaveis)}</code> (${receita - fixas - variaveis >= 0 ? 'Sobra' : 'Déficit'})
+💰 <b>RAIO-X MENSAL (FLUXO DE CAIXA EM CONTA)</b>
+•   <b>Receita Líquida (Crédito em Conta):</b> <code>R$ ${formatarRealLocal(receita)}</code>
+•   <b>Dívidas Externas (Parcelas Fora da Folha):</b> <code>R$ ${formatarRealLocal(fixas)}</code>
+•   <b>Despesas Variáveis (Média 30d):</b> <code>R$ ${formatarRealLocal(variaveis)}</code>
+•   <b>Saldo Livre Mensal:</b> <code>${sobraReal >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(sobraReal)}</code> (${sobraReal >= 0 ? 'Sobra' : 'Déficit'})
 
 ---
 
-⚡ <b>CENÁRIO A | Sobrevivência (Corte de 15%)</b>
-•   <b>Ação:</b> Reduzir gastos variáveis em <b>15%</b> (Economia de <code>R$ ${formatarRealLocal(variaveis * 0.15)}</code> por mês).
-•   <b>Novo Saldo Livre:</b> <code>${sobraA >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(sobraA)}</code> (${sobraA >= 0 ? 'Sobra' : 'Déficit'})
+📋 <b>CONTRATOS E DÍVIDAS CONSIDERADOS</b>
+${(divList && divList.length > 0)
+  ? divList.map(d => `•   <b>${d.credor}:</b> <code>R$ ${formatarRealLocal(d.valor_parcela)}</code>/mês (${d.parcelas_restantes}x) [${d.ativa ? 'Manual/Externo' : 'Consignado'}]`).join('\n')
+  : '•   <i>Nenhuma dívida ou cartão cadastrado manualmente no sistema!</i>'}
+
+---
+
+⚠️ <b>AUDITORIA DA AZULA (Atenção, Humano!):</b>
+${diferencaNaoMapeadaFolha > 10 
+  ? `•   🔴 <b>CONTRATOS PENDENTES:</b> Seu holerite desconta <code>R$ ${formatarRealLocal(totalEmprestimosFolha)}</code> em empréstimos, mas você só me mandou <code>R$ ${formatarRealLocal(totalConsignadosTabela)}</code> em contratos! Tem <code>R$ ${formatarRealLocal(diferencaNaoMapeadaFolha)}/mês</code> de empréstimos NÃO DETALHADOS no sistema!\n` 
+  : ''}${dividasAtivas.length === 0 
+  ? '•   ℹ️ <b>SEM CARTÕES CADASTRADOS:</b> Você não tem faturas de cartão de crédito nem parcelas externas cadastradas!\n' 
+  : ''}•   😼 <b>Me responde a verdade:</b> Você me mandou TODOS os seus empréstimos e faturas de cartão, ou teve preguiça e deixou dívida de fora? Ontem a análise de redução de contas foi rejeitada justamente porque faltavam empréstimos! Se tiver dívida escondida, qualquer plano de corte é pura ilusão. Me manda os contratos e faturas que faltam agora!
+
+---
+
+⚡ <b>CENÁRIO A | Sobrevivência (Corte de 15% em Variáveis)</b>
+•   <b>Ação:</b> Reduzir gastos variáveis em <b>15%</b> (Economia de <code>R$ ${formatarRealLocal(variaveis * 0.15)}</code>/mês).
+•   <b>Novo Saldo Livre:</b> <code>${sobraA >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(sobraA)}</code> (${sobraA >= 0 ? 'Sobra' : 'Déficit'}).
 •   <b>Tempo de Recuperação:</b> <code>Saldo fora do vermelho em ${diasA} dias</code>.
 
-🤝 <b>CENÁRIO B | Renegociação (Foco em Dívidas)</b>
-•   <b>Ação:</b> Renegociar/suspender a maior parcela de dívida ativa (<code>R$ ${formatarRealLocal(maiorDivida)}</code>/mês) a partir do Mês 3.
-•   <b>Novo Saldo Livre (Mês 3+):</b> <code>${(receita - (fixas - maiorDivida) - variaveis) >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(receita - (fixas - maiorDivida) - variaveis)}</code> (${(receita - (fixas - maiorDivida) - variaveis) >= 0 ? 'Sobra' : 'Déficit'}).
+🤝 <b>CENÁRIO B | Renegociação (Foco em Alívio de Parcelas)</b>
+•   <b>Ação:</b> ${maiorDivida > 0 ? `Renegociar ou amortizar a maior parcela identificada (<code>R$ ${formatarRealLocal(maiorDivida)}</code>/mês a partir do Mês 3).` : 'Quitar antecipadamente parcelas e direcionar a sobra para reserva de emergência.'}
+•   <b>Novo Saldo Livre:</b> <code>${(sobraReal + maiorDivida) >= 0 ? '🟢' : '🔴'} R$ ${formatarRealLocal(sobraReal + maiorDivida)}</code> (${(sobraReal + maiorDivida) >= 0 ? 'Sobra' : 'Déficit'}).
 •   <b>Tempo de Recuperação:</b> <code>Saldo fora do vermelho no ${diasB}º mês</code>.
 
 ---
@@ -1312,9 +1352,9 @@ Humano, fiz as contas. Aqui está o seu raio-x financeiro atual e as duas altern
 === FIM DO TEMPLATE ===
 
 Importante:
-- Não adicione textos extras antes ou depois do template, comece diretamente com "😺 **AZULA | ESTUDO DE CAMINHO FINANCEIRO** 🐾".
-- Use exatamente as marcações em negrito e blocos de código com crases (\`) para destacar os valores.
-- Mantenha a persona debochada e sarcástica da Azula, mas respeite a estrutura do template de forma impecável para facilitar a leitura da Priscila.
+- Não adicione preâmbulos, comece diretamente com o template.
+- Use rigorosamente o HTML para formatação de negrito e códigos.
+- Mantenha a persona da Azula atrevida, exigindo que o humano mande todos os contratos pendentes se os dados estiverem incompletos!
 `;
       }
     } catch (e: any) {

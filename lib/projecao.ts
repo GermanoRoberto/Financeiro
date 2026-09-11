@@ -22,10 +22,14 @@ export function projetarDescontos(
   const meses: ProjecaoMes[] = [];
   const hoje = startOfMonth(new Date());
 
-  // Mapear se o usuário possui contratos de consignados ativos na tabela de dívidas
-  const usuarioIdsComConsignado = new Set(
-    dividas.filter((d) => !d.ativa).map((d) => d.usuario_id)
-  );
+  // Mapear soma das parcelas de consignados cadastrados na tabela de dívidas por usuário
+  const somaConsignadosTabelaPorUsuario = new Map<string, number>();
+  dividas
+    .filter((d) => !d.ativa && d.usuario_id)
+    .forEach((d) => {
+      const atual = somaConsignadosTabelaPorUsuario.get(d.usuario_id!) || 0;
+      somaConsignadosTabelaPorUsuario.set(d.usuario_id!, somarValores([atual, d.valor_parcela]));
+    });
 
   for (let i = 0; i < mesesAFrente; i++) {
     const mes = addMonths(hoje, i);
@@ -54,9 +58,13 @@ export function projetarDescontos(
       return true; // recorrente indefinido
     });
 
-    // 2. Coletar descontos de empréstimos em folha para projetar como dívidas (apenas se não detalhados na tabela dividas)
-    const descontosEmprestimoComoDivida = descontos.filter((d) => {
-      if (!d.confirmado) return false;
+    // 2. Coletar descontos de empréstimos em folha para projetar como dívidas
+    // Se o usuário tem contratos detalhados na tabela dividas que cobrem apenas parte do desconto em folha,
+    // projeta a diferença não detalhada para não ocultar despesas reais do orçamento
+    const descontosEmprestimoComoDivida: Desconto[] = [];
+
+    for (const d of descontos) {
+      if (!d.confirmado) continue;
 
       const tipoLower = (d.tipo || '').toLowerCase();
       const ehEmprestimo = tipoLower.includes('empréstimo') || 
@@ -64,28 +72,38 @@ export function projetarDescontos(
                            tipoLower.includes('cef') || 
                            tipoLower.includes('crédito trabalhador');
 
-      if (!ehEmprestimo) return false;
+      if (!ehEmprestimo) continue;
 
-      // Obter ID do usuário do contracheque
       const cc = (d as any).contracheque;
       const usuarioId = cc?.usuario_id || null;
 
-      // Se o usuário tem contratos de consignados cadastrados na tabela 'dividas',
-      // nós ignoramos o desconto de folha para evitar dupla contagem, projetando apenas as parcelas exatas da tabela
-      if (usuarioId && usuarioIdsComConsignado.has(usuarioId)) {
-        return false;
+      let valorEfetivo = d.valor;
+      if (usuarioId && somaConsignadosTabelaPorUsuario.has(usuarioId)) {
+        const totalTabela = somaConsignadosTabelaPorUsuario.get(usuarioId) || 0;
+        const diferenca = round2(d.valor - totalTabela);
+        if (diferenca <= 5) {
+          // Os contratos da tabela já cobrem o desconto do holerite
+          continue;
+        }
+        // Os contratos cobrem apenas parte. Projetar o saldo pendente de detalhamento
+        valorEfetivo = diferenca;
       }
 
-      if (!d.recorrente) {
-        if (!d.parcela_total) return true; // Forçar recorrência padrão de empréstimo
+      if (!d.recorrente && !d.parcela_total && i > 0) {
+        continue;
       }
 
       if (d.parcela_total) {
         const restantes = (d.parcela_total || 0) - (d.parcela_atual || 0);
-        return i < restantes;
+        if (i >= restantes) continue;
       }
-      return true;
-    });
+
+      descontosEmprestimoComoDivida.push({
+        ...d,
+        valor: valorEfetivo,
+        tipo: valorEfetivo !== d.valor ? `${d.tipo} (Pendente de Detalhamento)` : d.tipo
+      });
+    }
 
     // 3. Filtrar dívidas da tabela (manuais ativas + consignadas inativas) válidas para este mês
     // e reduzir a quantidade de parcelas restantes conforme os meses passam

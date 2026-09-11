@@ -100,11 +100,19 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     return c.usuario_id === usuarioAtivo.id;
   });
 
-  // Obter o contracheque mais recente para calcular o resumo do mês atual
-  const ultimoMes = contrachequesAtivos[0]?.mes_referencia;
-  const contrachequesMesAtual = contrachequesAtivos.filter(
-    (c) => c.mes_referencia === ultimoMes
-  );
+  // Obter o contracheque mais recente de cada pessoa relevante para o resumo atual
+  let contrachequesMesAtual: Contracheque[] = [];
+  if (visao === 'casal') {
+    const ids = Array.from(new Set(contrachequesAtivos.map(c => c.usuario_id)));
+    contrachequesMesAtual = ids
+      .map(id => contrachequesAtivos.find(c => c.usuario_id === id))
+      .filter(Boolean) as Contracheque[];
+  } else {
+    const ultimoMes = contrachequesAtivos[0]?.mes_referencia;
+    contrachequesMesAtual = contrachequesAtivos.filter(
+      (c) => c.mes_referencia === ultimoMes
+    );
+  }
 
   const salarioBruto = somarValores(contrachequesMesAtual.map((c) => c.salario_bruto || 0));
   const salarioLiquido = somarValores(contrachequesMesAtual.map((c) => c.salario_liquido || 0));
@@ -115,6 +123,13 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     const contrachequeUserId = contrachequeObj?.usuario_id;
     if (visao === 'casal') return true;
     return contrachequeUserId === usuarioAtivo.id;
+  });
+
+  // Descontos específicos dos contracheques do mês de referência atual para os KPIs do topo
+  const ccIdsMesAtual = new Set(contrachequesMesAtual.map(c => c.id));
+  const descontosMesAtual = descontosAtivos.filter((d: any) => {
+    const ccId = d.contracheque_id || (d as any).contracheque?.id;
+    return ccIdsMesAtual.has(ccId);
   });
 
   // Filtrar dividas conforme a visão (apenas ativas para projeção de caixa)
@@ -156,10 +171,10 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     }
   }, [_gastos, gastosFiltrados, visao, verTodasTransacoes, usuario.id, usuarioEsposa]);
 
-  const totalDescontos = somarValores(descontosAtivos.map((d: any) => d.valor || 0));
+  const totalDescontos = somarValores(descontosMesAtual.map((d: any) => d.valor || 0));
   const comprometimento = calcularComprometimento(totalDescontos, salarioBruto);
 
-  const projecao = projetarDescontos(descontosAtivos, dividasAba, salarioBruto, 12);
+  const projecao = projetarDescontos(descontosMesAtual, dividasAba, salarioBruto, 12);
 
   const handleLogout = async () => {
     await logout();
