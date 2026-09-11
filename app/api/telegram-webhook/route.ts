@@ -1211,12 +1211,43 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
         }
       }
 
+      // Buscar dados do cônjuge / parceiro para controle de paridade do casal
+      const { data: parceiro } = await supabase
+        .from('usuarios_permitidos')
+        .select('*')
+        .neq('id', usuario.id)
+        .limit(1)
+        .maybeSingle();
+
+      let ccParceiro = null;
+      if (parceiro) {
+        const { data: ccP } = await supabase
+          .from('contracheques')
+          .select('*')
+          .eq('usuario_id', parceiro.id)
+          .order('mes_referencia', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        ccParceiro = ccP;
+      }
+
+      const mesUsuarioStr = cc?.mes_referencia ? cc.mes_referencia.substring(0, 7) : null;
+      const mesParceiroStr = ccParceiro?.mes_referencia ? ccParceiro.mes_referencia.substring(0, 7) : null;
+      const casalSincronizado = Boolean(
+        parceiro &&
+        cc &&
+        ccParceiro &&
+        mesUsuarioStr &&
+        mesParceiroStr &&
+        mesUsuarioStr === mesParceiroStr
+      );
+
       const diferencaNaoMapeadaFolha = Math.max(0, Math.round((totalEmprestimosFolha - totalConsignadosTabela) * 100) / 100);
 
       // As despesas fixas a serem pagas da conta são as dívidas externas
       // (pois os descontos de folha já foram abatidos na fonte antes do líquido cair na conta)
       const fixas = totalDividasExternas;
-      const receita = cc?.salario_liquido || (usuario.nome.toLowerCase().includes('priscila') ? 3120.39 : 2356.22);
+      const receita = cc?.salario_liquido || 0;
 
       // Buscar despesas variáveis nos últimos 30 dias
       const hoje = new Date();
@@ -1230,7 +1261,7 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
 
       const variaveis = (listGastos || [])
         .filter(g => g.categoria !== 'receita_extra' && g.categoria !== 'transferencia')
-        .reduce((acc, g) => acc + g.valor, 0) || (usuario.nome.toLowerCase().includes('priscila') ? 900 : 1800);
+        .reduce((acc, g) => acc + g.valor, 0);
 
       const sobraReal = Math.round((receita - fixas - variaveis) * 100) / 100;
       const sobraA = Math.round((receita - fixas - (variaveis * 0.85)) * 100) / 100;
@@ -1289,9 +1320,17 @@ async function gerarConversaAzula(chatId: number, textoUsuario: string): Promise
                            textCleanCheck.includes("reducao de contas") ||
                            textCleanCheck.includes("analise de reducao");
 
+      const perguntandoSobreCasal = textCleanCheck.includes("casal") ||
+                                    textCleanCheck.includes("nosso") ||
+                                    textCleanCheck.includes("nossa") ||
+                                    textCleanCheck.includes("juntos") ||
+                                    textCleanCheck.includes("dois") ||
+                                    textCleanCheck.includes("conjunt");
+
       contextoFinanceiro = `
 DADOS FINANCEIROS REAIS DO HUMANO (Use isso para fazer contas ou responder perguntas sobre dinheiro/empréstimos):
 - Dono ativo: ${usuario.nome}
+- Mês Ativo: ${mesUsuarioStr || 'Sem holerite recente'}
 - Salário Bruto de Referência: R$ ${cc?.salario_bruto || 0}
 - Salário Líquido de Referência: R$ ${cc?.salario_liquido || 0}
 - Descontos em folha cadastrados:
@@ -1299,7 +1338,24 @@ ${descontosTexto}
 - Empréstimos e Dívidas cadastrados:
 ${dividasTexto}
 - Gastos variáveis lançados em conta este mês: R$ ${totalGastos}
+
+DADOS DE PARIDADE DO CASAL:
+- Parceiro(a): ${parceiro?.nome || 'Não cadastrado'}
+- Mês Ativo do Parceiro: ${mesParceiroStr || 'Não cadastrado'}
+- Sincronização do Casal: ${casalSincronizado ? 'SINCRONIZADO' : 'BLOQUEADO POR DIVERGÊNCIA DE DADOS'}
 `;
+
+      if (perguntandoSobreCasal && !casalSincronizado) {
+        contextoFinanceiro += `
+🚨 REGRA INVIOLÁVEL DE GOVERNANÇA FINANCEIRA (BLOQUEIO DO CASAL):
+O usuário está perguntando sobre as finanças, contas ou estudo do CASAL / CONJUNTO, mas os dados estão DESINCRONIZADOS e DIVERGENTES:
+- ${usuario.nome} está no mês de referência ${mesUsuarioStr || 'indefinido'}
+- ${parceiro?.nome || 'A parceira'} está parada no mês de referência ${mesParceiroStr || 'indefinido'} (e com dívidas/contratos pendentes de cadastro)
+Você NÃO DEVE, sob hipótese alguma, inventar ou somar números para o casal!
+Explique de forma debochada e ácida que o Painel do Casal está TRAVADO por divergência de dados: você é uma gata com rigor contábil e não soma salários de meses diferentes nem inventa sobras quando faltam contas.
+Mande ${usuario.nome} cobrar da ${parceiro?.nome ? (parceiro.nome.toLowerCase().includes('priscila') ? 'Velha (Priscila)' : parceiro.nome) : 'parceira'} o envio dos holerites recentes e de todas as dívidas/cartões antes de pedir conta conjunta. Ofereça analisar apenas os dados individuais dele (${usuario.nome}) por enquanto!
+`;
+      }
 
       if (pedirEstudo) {
         contextoFinanceiro += `

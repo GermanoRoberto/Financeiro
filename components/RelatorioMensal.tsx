@@ -101,6 +101,8 @@ export default function RelatorioMensal({ contracheques, gastos, dividas, visao:
       const saldoLiquido = totalEntradas - totalSaidas;
       const poupancaPercent = totalEntradas > 0 ? Math.round((saldoLiquido / totalEntradas) * 100) : 0;
 
+      const usuariosPresentes = Array.from(new Set(contrachequesMes.map(c => c.usuario_nome)));
+
       return {
         mesKey: mes,
         mesNome: anoMesExtenso.charAt(0).toUpperCase() + anoMesExtenso.slice(1),
@@ -114,6 +116,7 @@ export default function RelatorioMensal({ contracheques, gastos, dividas, visao:
         transferencias: transferenciasMes,
         saldoLiquido,
         poupancaPercent,
+        usuariosPresentes,
       };
     });
   }, [contracheques, gastos, dividas]);
@@ -128,7 +131,20 @@ export default function RelatorioMensal({ contracheques, gastos, dividas, visao:
             {/* Header do Mês */}
             <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 mb-6 gap-4">
               <div>
-                <h3 className="text-xl font-bold text-slate-800">{rel.mesNome}</h3>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-xl font-bold text-slate-800">{rel.mesNome}</h3>
+                  {_visao === 'casal' && (
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      rel.usuariosPresentes.length >= 2
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {rel.usuariosPresentes.length >= 2 
+                        ? '👫 Casal Sincronizado' 
+                        : `⚠️ Apenas ${rel.usuariosPresentes[0] || '1 parceiro'}`}
+                    </span>
+                  )}
+                </div>
                 <p className="text-slate-400 text-xs mt-1">Resumo consolidado de fluxos financeiros</p>
               </div>
               <div className="flex items-center gap-3">

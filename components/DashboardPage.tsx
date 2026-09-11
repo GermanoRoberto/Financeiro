@@ -18,6 +18,7 @@ import CadastroTransacao from '@/components/CadastroTransacao';
 import PainelEmprestimos from '@/components/PainelEmprestimos';
 import RelatorioMensal from '@/components/RelatorioMensal';
 import EstudoRecuperacao from '@/components/EstudoRecuperacao';
+import PainelCasalPendente from '@/components/PainelCasalPendente';
 import toast from 'react-hot-toast';
 
 type Visao = 'casal' | 'voce' | 'esposa';
@@ -92,7 +93,42 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     }
   };
 
+  const formatarMesAno = (dataStr?: string | null) => {
+    if (!dataStr) return 'Não cadastrado';
+    try {
+      const d = new Date(dataStr + (dataStr.length === 7 ? '-02' : 'T12:00:00Z'));
+      return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    } catch {
+      return dataStr;
+    }
+  };
+
   const usuarioAtivo = visao === 'esposa' && usuarioEsposa ? usuarioEsposa : usuario;
+
+  // 1. Identificar contracheque mais recente de cada cônjuge
+  const ccMaisRecenteVoce = contracheques
+    .filter(c => c.usuario_id === usuario.id)
+    .sort((a, b) => new Date(b.mes_referencia).getTime() - new Date(a.mes_referencia).getTime())[0];
+
+  const ccMaisRecenteEsposa = usuarioEsposa
+    ? contracheques
+        .filter(c => c.usuario_id === usuarioEsposa.id)
+        .sort((a, b) => new Date(b.mes_referencia).getTime() - new Date(a.mes_referencia).getTime())[0]
+    : null;
+
+  const mesVoceStr = ccMaisRecenteVoce?.mes_referencia || null;
+  const mesEsposaStr = ccMaisRecenteEsposa?.mes_referencia || null;
+
+  // Governança e Sincronização do Casal:
+  // Só é considerado sincronizado se ambos têm contracheque cadastrado no mesmo mês de referência
+  const casalSincronizado = Boolean(
+    usuarioEsposa &&
+    ccMaisRecenteVoce &&
+    ccMaisRecenteEsposa &&
+    mesVoceStr &&
+    mesEsposaStr &&
+    mesVoceStr.substring(0, 7) === mesEsposaStr.substring(0, 7)
+  );
 
   // Filtrar contracheques conforme a visão
   const contrachequesAtivos = contracheques.filter((c) => {
@@ -103,15 +139,16 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   // Obter o contracheque mais recente de cada pessoa relevante para o resumo atual
   let contrachequesMesAtual: Contracheque[] = [];
   if (visao === 'casal') {
-    const ids = Array.from(new Set(contrachequesAtivos.map(c => c.usuario_id)));
-    contrachequesMesAtual = ids
-      .map(id => contrachequesAtivos.find(c => c.usuario_id === id))
-      .filter(Boolean) as Contracheque[];
+    if (casalSincronizado && ccMaisRecenteVoce && ccMaisRecenteEsposa) {
+      contrachequesMesAtual = [ccMaisRecenteVoce, ccMaisRecenteEsposa];
+    } else {
+      // Bloqueado por assimetria: não consolida números divergentes
+      contrachequesMesAtual = [];
+    }
+  } else if (visao === 'voce') {
+    contrachequesMesAtual = ccMaisRecenteVoce ? [ccMaisRecenteVoce] : [];
   } else {
-    const ultimoMes = contrachequesAtivos[0]?.mes_referencia;
-    contrachequesMesAtual = contrachequesAtivos.filter(
-      (c) => c.mes_referencia === ultimoMes
-    );
+    contrachequesMesAtual = ccMaisRecenteEsposa ? [ccMaisRecenteEsposa] : [];
   }
 
   const salarioBruto = somarValores(contrachequesMesAtual.map((c) => c.salario_bruto || 0));
@@ -344,42 +381,61 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
           {abaAtiva === 'dashboard' && (
             <div className="space-y-8 animate-fadeIn">
               
-              {/* Seção de Resumos - Grid de Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <ResumoCard
-                  titulo="Salário Bruto"
-                  valor={salarioBruto}
-                  cor="blue"
+              {visao === 'casal' && !casalSincronizado ? (
+                <PainelCasalPendente
+                  usuario={usuario}
+                  usuarioEsposa={usuarioEsposa}
+                  mesVoce={formatarMesAno(mesVoceStr)}
+                  mesEsposa={formatarMesAno(mesEsposaStr)}
+                  liquidoVoce={ccMaisRecenteVoce?.salario_liquido || 0}
+                  liquidoEsposa={ccMaisRecenteEsposa?.salario_liquido || 0}
+                  onVerVoce={() => setVisao('voce')}
+                  onVerEsposa={() => setVisao('esposa')}
+                  onIrContracheque={() => setAbaAtiva('contracheque')}
                 />
-                <ResumoCard
-                  titulo="Salário Líquido"
-                  valor={salarioLiquido}
-                  cor="green"
-                />
-                <ResumoCard
-                  titulo="Comprometimento"
-                  valor={comprometimento}
-                  sufixo="%"
-                  cor={comprometimento > 50 ? 'red' : comprometimento > 30 ? 'yellow' : 'green'}
-                />
-              </div>
+              ) : (
+                <>
+                  {/* Seção de Resumos - Grid de Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <ResumoCard
+                      titulo="Salário Bruto"
+                      valor={salarioBruto}
+                      cor="blue"
+                    />
+                    <ResumoCard
+                      titulo="Salário Líquido"
+                      valor={salarioLiquido}
+                      cor="green"
+                    />
+                    <ResumoCard
+                      titulo="Comprometimento"
+                      valor={comprometimento}
+                      sufixo="%"
+                      cor={comprometimento > 50 ? 'red' : comprometimento > 30 ? 'yellow' : 'green'}
+                    />
+                  </div>
 
-              {/* Seção de Gráficos */}
-              <GraficosFinanceiros projecao={projecao} />
+                  {/* Seção de Gráficos */}
+                  <GraficosFinanceiros projecao={projecao} />
 
-              {/* Estudo de Recuperação (Cenários e Alertas) */}
-              <EstudoRecuperacao
-                transacoes={_gastos}
-                contracheques={contracheques}
-                descontos={descontos}
-                dividas={dividas}
-                usuario={usuario}
-                usuarioEsposa={usuarioEsposa}
-                visao={visao}
-              />
+                  {/* Estudo de Recuperação (Cenários e Alertas) */}
+                  <EstudoRecuperacao
+                    transacoes={_gastos}
+                    contracheques={contracheques}
+                    descontos={descontos}
+                    dividas={dividas}
+                    usuario={usuario}
+                    usuarioEsposa={usuarioEsposa}
+                    visao={visao}
+                    casalSincronizado={casalSincronizado}
+                    mesVoce={formatarMesAno(mesVoceStr)}
+                    mesEsposa={formatarMesAno(mesEsposaStr)}
+                  />
 
-              {/* Tabela de Prospecção */}
-              <TabMeses projecao={projecao} />
+                  {/* Tabela de Prospecção */}
+                  <TabMeses projecao={projecao} />
+                </>
+              )}
 
               {/* Listagem de Transações do Dia a Dia + Lançamento Manual */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">

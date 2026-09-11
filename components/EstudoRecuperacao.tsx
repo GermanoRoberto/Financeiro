@@ -13,6 +13,9 @@ interface EstudoRecuperacaoProps {
   usuario: Usuario;
   usuarioEsposa: Usuario | null;
   visao: 'casal' | 'voce' | 'esposa';
+  casalSincronizado?: boolean;
+  mesVoce?: string;
+  mesEsposa?: string;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -46,7 +49,10 @@ export default function EstudoRecuperacao({
   dividas,
   usuario,
   usuarioEsposa,
-  visao
+  visao,
+  casalSincronizado,
+  mesVoce,
+  mesEsposa
 }: EstudoRecuperacaoProps) {
   const [abaInterna, setAbaInterna] = useState<'casal' | 'voce' | 'esposa'>('casal');
 
@@ -54,21 +60,47 @@ export default function EstudoRecuperacao({
     setAbaInterna(visao);
   }, [visao]);
 
+  // Verificar paridade e sincronização entre os parceiros
+  const ccVoce = contracheques
+    .filter(c => c.usuario_id === usuario.id)
+    .sort((a, b) => new Date(b.mes_referencia).getTime() - new Date(a.mes_referencia).getTime())[0];
+
+  const ccEsposa = usuarioEsposa
+    ? contracheques
+        .filter(c => c.usuario_id === usuarioEsposa.id)
+        .sort((a, b) => new Date(b.mes_referencia).getTime() - new Date(a.mes_referencia).getTime())[0]
+    : null;
+
+  const mesVoceStr = ccVoce?.mes_referencia;
+  const mesEsposaStr = ccEsposa?.mes_referencia;
+
+  const estaSincronizado = casalSincronizado !== undefined
+    ? casalSincronizado
+    : Boolean(
+        usuarioEsposa &&
+        ccVoce &&
+        ccEsposa &&
+        mesVoceStr &&
+        mesEsposaStr &&
+        mesVoceStr.substring(0, 7) === mesEsposaStr.substring(0, 7)
+      );
+
   // 1. Filtrar contracheques mais recentes com base na aba ativa
   let ccsPerfil: Contracheque[] = [];
   if (abaInterna === 'casal') {
-    const ids = Array.from(new Set(contracheques.map(c => c.usuario_id)));
-    ccsPerfil = ids
-      .map(id => contracheques.find(c => c.usuario_id === id))
-      .filter(Boolean) as Contracheque[];
+    if (estaSincronizado && ccVoce && ccEsposa) {
+      ccsPerfil = [ccVoce, ccEsposa];
+    } else {
+      ccsPerfil = [];
+    }
   } else {
     const targetId = abaInterna === 'voce' ? usuario.id : usuarioEsposa?.id;
     const cc = contracheques.find(c => c.usuario_id === targetId);
     if (cc) ccsPerfil = [cc];
   }
 
-  // Receita Líquida real que entra em conta bancária
-  const receita = somarValores(ccsPerfil.map(c => c.salario_liquido || 0)) || (abaInterna === 'casal' ? 5476.61 : 2738.30);
+  // Receita Líquida real que entra em conta bancária (sem números fictícios)
+  const receita = somarValores(ccsPerfil.map(c => c.salario_liquido || 0));
 
   // Descontos em folha do mês atual (já deduzidos na fonte)
   const ccIdsPerfil = new Set(ccsPerfil.map(c => c.id));
@@ -124,7 +156,7 @@ export default function EstudoRecuperacao({
     return isDespesa && dGasto >= trintaDiasAtras;
   });
   const totalDespesasVariaveis = somarValores(despesasVariaveisRecentes.map(g => g.valor || 0));
-  const despesasVariaveis = totalDespesasVariaveis || (abaInterna === 'casal' ? 1800 : 900);
+  const despesasVariaveis = totalDespesasVariaveis;
 
   // FLUXO DE CAIXA REAL:
   // Salário Líquido que entra na conta - Dívidas Externas (fora da folha) - Gastos Variáveis
@@ -262,105 +294,149 @@ export default function EstudoRecuperacao({
         </div>
       </div>
 
-      {/* Raio-X do Fluxo de Caixa Mensal */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-        <div>
-          <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Receita Líquida (Na Conta)</span>
-          <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(receita)}</span>
-        </div>
-        <div>
-          <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Dívidas Externas (Fixas)</span>
-          <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(totalDividasExternas)}</span>
-        </div>
-        <div>
-          <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Variáveis (Média 30d)</span>
-          <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(despesasVariaveis)}</span>
-        </div>
-        <div>
-          <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Saldo Livre Mensal</span>
-          <span className={`text-sm font-bold font-mono ${sobraAtual >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {sobraAtual >= 0 ? '+' : ''}R$ {formatarBRL(sobraAtual)}
-          </span>
-        </div>
-      </div>
-
-      {/* Cenários Detalhados */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Cenário A */}
-        <div className="bg-blue-50/50 border border-blue-100 p-5 rounded-2xl space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-blue-600 text-sm flex items-center gap-1.5">
-              <span>🛡️</span> Cenário A (Foco em Sobrevivência)
-            </h4>
-            <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold uppercase">
-              Corte de 15%
-            </span>
+      {/* Se a aba for Casal e os dados estiverem desincronizados, bloquear a projeção conjunta */}
+      {abaInterna === 'casal' && !estaSincronizado ? (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-slate-800 space-y-4">
+          <div className="flex items-center gap-3 text-amber-700 font-bold text-base">
+            <span className="text-2xl">🔒</span>
+            <span>Estudo do Casal Bloqueado: Sincronização de Meses Pendente</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Reduzir despesas variáveis em <strong>15%</strong> (Economia mensal de <strong>R$ {formatarBRL(despesasVariaveis * 0.15)}</strong>).
+            Para gerar um <strong>Estudo de Caminho e Recuperação Conjunto</strong> de 6 meses matematicamente confiável, ambos os parceiros precisam estar com os holerites do mesmo mês cadastrados. Atualmente, os meses de referência divergem:
           </p>
-          <div className="text-xs font-bold text-slate-500">
-            Impacto: {mesViradaA > 0 ? `Sairá do vermelho em até ${mesViradaA * 30} dias.` : 'Tendência de melhora gradual.'}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white/80 p-4 rounded-xl border border-amber-200">
+            <div>
+              <span className="font-bold text-slate-700 block">Você ({usuario.nome}):</span>
+              <span className="text-emerald-600 font-medium">Mês Ativo: {mesVoce || 'Atualizado'} ✅</span>
+            </div>
+            <div>
+              <span className="font-bold text-slate-700 block">{usuarioEsposa?.nome || 'Parceiro(a)'}:</span>
+              <span className="text-amber-600 font-medium">Mês Ativo: {mesEsposa || 'Pendente de envio'} ⚠️</span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">
+            Selecione uma das abas acima ou clique nos botões abaixo para ver o estudo real e individual de cada um:
+          </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              onClick={() => setAbaInterna('voce')}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+            >
+              🙋‍♂️ Ver Estudo de Você ({usuario.nome})
+            </button>
+            {usuarioEsposa && (
+              <button
+                onClick={() => setAbaInterna('esposa')}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                🙋‍♀️ Ver Estudo da {usuarioEsposa.nome.split(' ')[0]}
+              </button>
+            )}
           </div>
         </div>
+      ) : (
+        <>
+          {/* Raio-X do Fluxo de Caixa Mensal */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div>
+              <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Receita Líquida (Na Conta)</span>
+              <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(receita)}</span>
+            </div>
+            <div>
+              <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Dívidas Externas (Fixas)</span>
+              <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(totalDividasExternas)}</span>
+            </div>
+            <div>
+              <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Variáveis (Média 30d)</span>
+              <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(despesasVariaveis)}</span>
+            </div>
+            <div>
+              <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Saldo Livre Mensal</span>
+              <span className={`text-sm font-bold font-mono ${sobraAtual >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {sobraAtual >= 0 ? '+' : ''}R$ {formatarBRL(sobraAtual)}
+              </span>
+            </div>
+          </div>
 
-        {/* Cenário B */}
-        <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-2xl space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-amber-600 text-sm flex items-center gap-1.5">
-              <span>🤝</span> Cenário B (Foco em Renegociação)
+          {/* Cenários Detalhados */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Cenário A */}
+            <div className="bg-blue-50/50 border border-blue-100 p-5 rounded-2xl space-y-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-blue-600 text-sm flex items-center gap-1.5">
+                  <span>🛡️</span> Cenário A (Foco em Sobrevivência)
+                </h4>
+                <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold uppercase">
+                  Corte de 15%
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Reduzir despesas variáveis em <strong>15%</strong> (Economia mensal de <strong>R$ {formatarBRL(despesasVariaveis * 0.15)}</strong>).
+              </p>
+              <div className="text-xs font-bold text-slate-500">
+                Impacto: {mesViradaA > 0 ? `Sairá do vermelho em até ${mesViradaA * 30} dias.` : 'Tendência de melhora gradual.'}
+              </div>
+            </div>
+
+            {/* Cenário B */}
+            <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-2xl space-y-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-amber-600 text-sm flex items-center gap-1.5">
+                  <span>🤝</span> Cenário B (Foco em Renegociação)
+                </h4>
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase">
+                  Alívio de Parcela
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {maiorDivida > 0 
+                  ? <>Renegociar ou quitar a maior parcela identificada neste perfil (alívio de <strong>R$ {formatarBRL(maiorDivida)}/mês</strong> a partir do Mês 3).</>
+                  : <>Nenhuma dívida ativa para renegociar neste perfil. O foco deve ser corte de custos variáveis.</>}
+              </p>
+              <div className="text-xs font-bold text-slate-500">
+                Impacto: {mesViradaB > 0 ? `Sairá do vermelho no ${mesViradaB}º mês.` : 'Estabilização progressiva.'}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Gráfico de Projeção */}
+          <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl">
+            <h4 className="font-bold text-slate-500 text-xs mb-4 uppercase tracking-wider">
+              Projeção do Saldo Acumulado ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Seu perfil' : `Perfil da ${usuarioEsposa?.nome.split(' ')[0]}`})
             </h4>
-            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase">
-              Alívio de Parcela
-            </span>
+            <div className="h-[260px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={dadosGrafico} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
+                  <XAxis dataKey="mes" stroke="#64748b" fontSize={11} />
+                  <YAxis stroke="#64748b" fontSize={11} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                  <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" />
+                  <Line
+                    type="monotone"
+                    dataKey="Cenário A (Corte)"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: '#0946b5' }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Cenário B (Renegociação)"
+                    stroke="#f59e0b"
+                    strokeWidth={3}
+                    dot={{ r: 4, stroke: '#f59e0b', strokeWidth: 2, fill: '#120436' }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            {maiorDivida > 0 
-              ? <>Renegociar ou quitar a maior parcela identificada neste perfil (alívio de <strong>R$ {formatarBRL(maiorDivida)}/mês</strong> a partir do Mês 3).</>
-              : <>Nenhuma dívida ativa para renegociar neste perfil. O foco deve ser corte de custos variáveis.</>}
-          </p>
-          <div className="text-xs font-bold text-slate-500">
-            Impacto: {mesViradaB > 0 ? `Sairá do vermelho no ${mesViradaB}º mês.` : 'Estabilização progressiva.'}
-          </div>
-        </div>
-
-      </div>
-
-      {/* Gráfico de Projeção */}
-      <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl">
-        <h4 className="font-bold text-slate-500 text-xs mb-4 uppercase tracking-wider">
-          Projeção do Saldo Acumulado ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Seu perfil' : `Perfil da ${usuarioEsposa?.nome.split(' ')[0]}`})
-        </h4>
-        <div className="h-[260px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={dadosGrafico} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
-              <XAxis dataKey="mes" stroke="#64748b" fontSize={11} />
-              <YAxis stroke="#64748b" fontSize={11} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-              <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" />
-              <Line
-                type="monotone"
-                dataKey="Cenário A (Corte)"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                dot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: '#0946b5' }}
-                activeDot={{ r: 6 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="Cenário B (Renegociação)"
-                stroke="#f59e0b"
-                strokeWidth={3}
-                dot={{ r: 4, stroke: '#f59e0b', strokeWidth: 2, fill: '#120436' }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Rastreador de Alertas */}
       <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl space-y-3 shadow-sm">
