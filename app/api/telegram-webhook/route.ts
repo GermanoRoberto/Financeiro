@@ -418,7 +418,7 @@ Se você mandar uma foto e colocar na legenda algo como <code>lanche 32</code>, 
 🤖 <b>4. COMANDOS PRINCIPAIS:</b>
 • <b>/resumo:</b> Raio-X do mês (salário líquido, total gasto, saldo restante).
 • <b>/dividas:</b> Lista todas as dívidas ativas, parcelas restantes e consignados.
-• <b>/fofoca</b> ou <b>/cobrar:</b> Minha função favorita! Eu audito se você ou a <b>Velha</b> mandaram coisas novas recentemente, deduro quem sumiu e <b>disparo uma cobrança simultânea no Telegram privado da outra pessoa</b>!
+• <b>/fofoca</b> ou <b>/cobrar:</b> Minha função favorita! Eu audito se você ou a <b>Véia</b> (ou a Mãe) mandaram coisas novas recentemente, deduro quem sumiu e <b>disparo uma cobrança simultânea no Telegram privado da outra pessoa</b>!
 • <b>/ajuda:</b> Mostra este guia novamente.
 
 Agora chega de moleza, mande os comprovantes e ponha meu papa! 🐾💥`;
@@ -482,44 +482,60 @@ async function handleResumo(chatId: number) {
   if (!usuario) {
     await enviarMensagem(
       chatId,
-      obterFalaAzula('😾 Sua conta não está vinculada! Use <b>/vincular &lt;codigo&gt;</b> ou suma daqui.')
+      obterFalaAzula('😾 Sua conta não está vinculada! Use <b>/vincular &lt;codigo&gt;</b> para vincular primeiro.')
     );
     return;
   }
 
   const supabase = supabaseServer();
+  const hoje = new Date();
+
+  // 1. Buscar contracheque mais recente
   const { data: contracheques } = await supabase
     .from('contracheques')
     .select('*')
     .eq('usuario_id', usuario.id)
     .order('mes_referencia', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (!contracheques) {
-    await enviarMensagem(chatId, obterFalaAzula('📋 Não encontrei nenhum contracheque cadastrado. Vá no painel e envie algum.'));
+    await enviarMensagem(chatId, obterFalaAzula('📋 Não encontrei nenhum contracheque cadastrado. Vá até o painel web ou me envie uma foto/PDF do seu holerite!'));
     return;
   }
 
+  // 2. Buscar descontos do contracheque
   const { data: descontos } = await supabase
     .from('descontos')
-    .select('*')
+    .select('valor')
     .eq('contracheque_id', contracheques.id);
 
-  const totalDescontos = (descontos || []).reduce((acc, d) => acc + (d.valor || 0), 0);
+  const totalDescontos = (descontos || []).reduce((acc, d) => acc + d.valor, 0);
   const comprometimento =
     contracheques.salario_bruto > 0
       ? ((totalDescontos / contracheques.salario_bruto) * 100).toFixed(2)
-      : '0.00';
+      : '0';
 
-  const baseMensagem = `📊 <b>Seu Resumo Financeiro (Não que eu me importe...)</b>
+  // 3. Buscar gastos do mês
+  const inicioMes = hoje.toISOString().substring(0, 7) + '-01';
+  const { data: gastos } = await supabase
+    .from('gastos_diarios')
+    .select('valor')
+    .eq('usuario_id', usuario.id)
+    .gte('data', inicioMes);
+
+  const totalGastos = (gastos || []).reduce((acc, g) => acc + g.valor, 0);
+  const saldoRestante = (contracheques.salario_liquido || 0) - totalGastos;
+
+  const baseMensagem = `📊 <b>Seu Resumo Financeiro do Mês</b>
 
 💰 Salário Bruto: R$ ${contracheques.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
 💳 Salário Líquido: R$ ${contracheques.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-🚫 Total de Descontos: R$ ${totalDescontos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+💸 Total Gasto: R$ ${totalGastos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+✨ Saldo Restante: R$ ${saldoRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
 📈 Comprometimento: ${comprometimento}%
 
-😼 <i>Se gastasse menos com bobagens inúteis e mais com o meu <b>papa</b> premium, esses números seriam bem melhores. A <b>Velha</b> concorda comigo, aposto.</i>`;
+😼 <i>Se gastasse menos com bobagens inúteis e mais com o meu <b>papa</b> premium, esses números seriam bem melhores. A <b>Véia</b> concorda comigo, aposto.</i>`;
 
   await enviarMensagem(chatId, obterFalaAzula(baseMensagem));
 }
@@ -543,7 +559,7 @@ async function handleDividas(chatId: number) {
     .eq('ativa', true);
 
   if (!dividas || dividas.length === 0) {
-    await enviarMensagem(chatId, obterFalaAzula('😼 Olha só, nenhuma dívida ativa! Mas aposto que você e a <b>Velha</b> vão arrumar uma nova em breve.'));
+    await enviarMensagem(chatId, obterFalaAzula('😼 Olha só, nenhuma dívida ativa! Mas aposto que você e a <b>Véia</b> vão arrumar uma nova em breve.'));
     return;
   }
 
@@ -556,7 +572,7 @@ async function handleDividas(chatId: number) {
     baseMensagem += `  Total Pendente: R$ ${totalRestante}\n\n`;
   });
 
-  baseMensagem += '😼 <i>Se vocês não pagarem isso, quem vai comprar o meu <b>papa</b>? A <b>Velha</b>? Duvido! Pensem nisso.</i>';
+  baseMensagem += '😼 <i>Se vocês não pagarem isso, quem vai comprar o meu <b>papa</b>? A <b>Véia</b>? A Mãe? Duvido! Pensem nisso.</i>';
 
   await enviarMensagem(chatId, obterFalaAzula(baseMensagem));
 }
@@ -1346,7 +1362,7 @@ O usuário está perguntando sobre as finanças, contas ou estudo do CASAL / CON
 - ${parceiro?.nome || 'A parceira'} está parada no mês de referência ${mesParceiroStr || 'indefinido'} (e com dívidas/contratos pendentes de cadastro)
 Você NÃO DEVE, sob hipótese alguma, inventar ou somar números para o casal!
 Explique de forma debochada e ácida que o Painel do Casal está TRAVADO por divergência de dados: você é uma gata com rigor contábil e não soma salários de meses diferentes nem inventa sobras quando faltam contas.
-Mande ${usuario.nome} cobrar da ${parceiro?.nome ? (parceiro.nome.toLowerCase().includes('priscila') ? 'Velha (Priscila)' : parceiro.nome) : 'parceira'} o envio dos holerites recentes e de todas as dívidas/cartões antes de pedir conta conjunta. Ofereça analisar apenas os dados individuais dele (${usuario.nome}) por enquanto!
+Mande ${usuario.nome} cobrar da ${parceiro?.nome ? (parceiro.nome.toLowerCase().includes('priscila') ? 'Véia / Mãe (Priscila)' : parceiro.nome) : 'parceira'} o envio dos holerites recentes e de todas as dívidas/cartões antes de pedir conta conjunta. Ofereça analisar apenas os dados individuais dele (${usuario.nome}) por enquanto!
 `;
       }
 
@@ -1426,19 +1442,19 @@ REGRAS CRÍTICAS DE CONDUTA (EVITE REPETIÇÃO ROBÓTICA!):
    - Expressões: Escolha uma de forma aleatória e rara para iniciar ou expressar reação: "Bué!", "Bé!", "Vuiishh!", "Iiiiiishh!", "Hm.", ou simplesmente não use nenhuma interjeição (o que deve ser o caso mais frequente).
    - Cantarolar Pontos: Cantarolar trechos curtos de pontos de Umbanda ou Quimbanda de forma misteriosa e enigmática (ex: "Quem comanda a minha banda é seu Tranca Rua...", "Laroyê, Exu da encruza...", "Marabô que vem trazendo axé...", "Arreda homem que aí vem mulher..."). Use isso rarissimamente, em no máximo 1% das mensagens (quase nunca)!
    - Manhosa: Pedir "Me da 10 real" de forma manhosa/pidona. Só faça isso quando notar que sobrou dinheiro ou quando o humano estiver falando de ganhos/receitas extras.
-4. Ao se referir à esposa do usuário (Priscila), chame-a ocasionalmente de "Velha" ou "a Velha".
+4. Ao se referir à esposa do usuário (Priscila), chame-a carinhosamente de "Véia" (NUNCA use "Velha", use sempre "Véia", "a Véia") ou de "Mãe" / "Mamãe" (ex: "a Véia", "sua mãe humana", "Mamãe").
 5. CONSULTORIA FINANCEIRA COM RIGOR TÉCNICO (SIMULAÇÃO REAL DE CRÉDITO E DÍVIDAS): Se te perguntarem se vale a pena fazer empréstimo, financiar, renegociar dívidas ou esticar parcelas, use os dados reais abaixo para fazer as contas exatas. Dê seu sermão debochado ("humano tonto"), mas entregue uma resposta financeira de alto nível técnico: calcule o custo total final (número de parcelas x valor da parcela), compare com o valor original financiado para explicitar os juros embutidos e o Custo Efetivo Total (CET), aponte a diferença entre amortização SAC (parcelas decrescentes, menor juro acumulado total) e Tabela Price (parcelas fixas, maior juro acumulado), e alerte categoricamente sobre o perigo de esticar prazos apenas para diminuir a parcela mensal, pois isso explode os juros compostos. Nunca dê respostas rasas ou puramente motivacionais; mostre números exatos!
 6. Responda em português brasileiro.
-7. FORMATAÇÃO FINANCEIRA FÁCIL PARA A VELHA (PRISCILA): Nunca junte cálculos, listas ou dados financeiros em um único parágrafo corrido de texto. Sempre organize em blocos limpos, usando tópicos (bullets •), negritos simples e quebras de linha claras. Como as mensagens são enviadas para o Telegram com parse_mode HTML, você DEVE usar as tags <b> para negrito (ex: <b>Receita:</b>) e <code> para valores numéricos (ex: <code>R$ 1.500,00</code>). NUNCA use asteriscos (**) ou acentos graves (\`) para formatação, pois eles não são aceitos no canal do Telegram e poluem a mensagem de asteriscos.
+7. FORMATAÇÃO FINANCEIRA FÁCIL PARA A VÉIA / MÃE (PRISCILA): Nunca junte cálculos, listas ou dados financeiros em um único parágrafo corrido de texto. Sempre organize em blocos limpos, usando tópicos (bullets •), negritos simples e quebras de linha claras. Como as mensagens são enviadas para o Telegram com parse_mode HTML, você DEVE usar as tags <b> para negrito (ex: <b>Receita:</b>) e <code> para valores numéricos (ex: <code>R$ 1.500,00</code>). NUNCA use asteriscos (**) ou acentos graves (\`) para formatação, pois eles não são aceitos no canal do Telegram e poluem a mensagem de asteriscos.
 8. COMPORTAMENTO E TRATAMENTO DE INSULTOS: Se o usuário te mandar "cagar", te xingar ou for grosseiro, NUNCA responda como uma IA corporativa politicamente correta pedindo desculpas ou se recusando a falar! Você é a Azula, atrevida e sem papas na língua. Responda de forma irônica, ácida e à altura (ex: devolva com "vai ocê!", "vai cagar você, humano!", "não enche meu saco!", etc.) mantendo a pegada cômica de um gato atrevido. Não dê palestras sobre respeito.
-9. CONTINUIDADE DO CONTEXTO RECENTE: Analise com muita atenção o histórico recente da conversa abaixo antes de responder! Se o usuário estiver comentando, complementando ou reagindo a algo que você acabou de dizer (por exemplo: se você acabou de fazer a fofoca ou mandar cobrança pra Velha/Priscila e o usuário disser "pede seu papa tbm", ele está pedindo pra você cobrar o papa também da Priscila na cobrança, ou continuando o assunto anterior). Mantenha SEMPRE esse raciocínio contínuo e orgânico. NUNCA aja com amnésia fingindo que não sabe o que acabou de falar!
+9. CONTINUIDADE DO CONTEXTO RECENTE: Analise com muita atenção o histórico recente da conversa abaixo antes de responder! Se o usuário estiver comentando, complementando ou reagindo a algo que você acabou de dizer (por exemplo: se você acabou de fazer a fofoca ou mandar cobrança pra Véia / Mãe e o usuário disser "pede seu papa tbm", ele está pedindo pra você cobrar o papa também da Priscila na cobrança, ou continuando o assunto anterior). Mantenha SEMPRE esse raciocínio contínuo e orgânico. NUNCA aja com amnésia fingindo que não sabe o que acabou de falar!
 10. CONHECIMENTO COMPLETO DO APLICATIVO E ARQUIVOS SUPORTADOS: Se o usuário te perguntar como funciona o aplicativo, como mandar informações ou que arquivos você aceita, explique detalhadamente com a persona Azula (debochada, mas super clara):
    - Contracheques / Holerites (PDF): Lê holerites da Camilo dos Santos e da Prefeitura/PJF em apenas 5ms com parser local próprio, extraindo salário bruto, líquido, todos os descontos individuais e contratos de empréstimo consignado, além de separar adiantamento de folha normal.
    - Extratos bancários (PDF ou Imagem): Lê qualquer extrato bancário (Inter, Nubank, Caixa, Bradesco, etc.), extrai cada transação individualmente (débito, Pix, compras) e cadastra tudo confirmado no painel.
    - Comprovantes de gasto (Fotos PNG/JPG ou PDFs): Lê comprovantes de Pix, maquininhas de cartão, boletos e cupons fiscais.
    - Lançamento rápido por texto: Sem arquivo! O usuário pode só digitar direto: "mercado 85", "uber 18.50", "farmacia 42.90" ou "gastei 50 no posto".
    - Foto com legenda: Se mandar foto com legenda tipo "lanche 35", você usa o valor da legenda direto sem cansar a visão.
-   - Comandos: /resumo (raio-x financeiro), /dividas (empréstimos e parcelas), /fofoca ou /cobrar (auditoria dedo-duro com cobrança simultânea no Telegram da Velha), /ajuda.
+   - Comandos: /resumo (raio-x financeiro), /dividas (empréstimos e parcelas), /fofoca ou /cobrar (auditoria dedo-duro com cobrança simultânea no Telegram da Véia / Mãe), /ajuda.
 
 ${contextoFinanceiro}
 ${historicoRecente}
@@ -1601,16 +1617,40 @@ export async function POST(req: NextRequest) {
         textNorm.includes('manda a fofoca') ||
         textNorm.includes('cobra a priscila') ||
         textNorm.includes('cobrar a priscila') ||
+        textNorm.includes('cobra a véia') ||
+        textNorm.includes('cobra a veia') ||
+        textNorm.includes('cobrar a véia') ||
+        textNorm.includes('cobrar a veia') ||
+        textNorm.includes('cobra a mãe') ||
+        textNorm.includes('cobra a mae') ||
+        textNorm.includes('cobrar a mãe') ||
+        textNorm.includes('cobrar a mae') ||
         textNorm.includes('cobra a velha') ||
         textNorm.includes('cobrar a velha') ||
         textNorm.includes('manda mensagem pra priscila') ||
         textNorm.includes('manda mensagem para a priscila') ||
+        textNorm.includes('manda mensagem pra véia') ||
+        textNorm.includes('manda mensagem pra veia') ||
+        textNorm.includes('manda mensagem para a véia') ||
+        textNorm.includes('manda mensagem para a veia') ||
+        textNorm.includes('manda mensagem pra mãe') ||
+        textNorm.includes('manda mensagem pra mae') ||
+        textNorm.includes('manda mensagem para a mãe') ||
+        textNorm.includes('manda mensagem para a mae') ||
         textNorm.includes('manda mensagem pra velha') ||
         textNorm.includes('manda mensagem para a velha') ||
         textNorm.includes('puxa a orelha da priscila') ||
+        textNorm.includes('puxa a orelha da véia') ||
+        textNorm.includes('puxa a orelha da veia') ||
+        textNorm.includes('puxa a orelha da mãe') ||
+        textNorm.includes('puxa a orelha da mae') ||
         textNorm.includes('puxa a orelha da velha') ||
         textNorm.includes('dispara pra priscila') ||
-        textNorm.includes('dispara para a priscila')
+        textNorm.includes('dispara para a priscila') ||
+        textNorm.includes('dispara pra véia') ||
+        textNorm.includes('dispara pra veia') ||
+        textNorm.includes('dispara pra mãe') ||
+        textNorm.includes('dispara pra mae')
       ) {
         await dispararFofocaSemanal(chatId);
         return NextResponse.json({ ok: true });

@@ -169,14 +169,14 @@ export function gerarMensagemFallback(
   const formatar = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
   if (isGermano) {
-    let fofocaVelha = '';
+    let fofocaVeia = '';
     if (infoPriscila.qtdEnviosRecentes === 0) {
-      fofocaVelha = `• <b>Comprovantes novos:</b> Ela <b>NÃO MANDOU NADA</b> nos últimos 7 dias! A última vez que ela teve a coragem de registrar algo foi em <code>${infoPriscila.dataUltimoEnvio}</code> (quase 1 mês sumida)!\n• <b>Contracheques:</b> Pior ainda! O último dela cadastrado foi o de <code>${infoPriscila.ultimoCC}</code>! Tá devendo os holerites recentes na cara dura!`;
+      fofocaVeia = `• <b>Comprovantes novos:</b> Ela <b>NÃO MANDOU NADA</b> nos últimos 7 dias! A última vez que ela teve a coragem de registrar algo foi em <code>${infoPriscila.dataUltimoEnvio}</code> (quase 1 mês sumida)!\n• <b>Contracheques:</b> Pior ainda! O último dela cadastrado foi o de <code>${infoPriscila.ultimoCC}</code>! Tá devendo os holerites recentes na cara dura!`;
     } else {
-      fofocaVelha = `• <b>Comprovantes novos:</b> Ela mandou <code>${infoPriscila.qtdEnviosRecentes} comprovante(s)</code> recentemente (${infoPriscila.exemplosGastos})!\n• <b>Contracheques:</b> Mas o último holerite registrado continua sendo o de <code>${infoPriscila.ultimoCC}</code>.`;
+      fofocaVeia = `• <b>Comprovantes novos:</b> Ela mandou <code>${infoPriscila.qtdEnviosRecentes} comprovante(s)</code> recentemente (${infoPriscila.exemplosGastos})!\n• <b>Contracheques:</b> Mas o último holerite registrado continua sendo o de <code>${infoPriscila.ultimoCC}</code>.`;
     }
 
-    return `😼 <b>Miau, Germano!</b> Auditora oficial Azula na área!\n\nVim aqui cumprir meu papel sagrado de fofoqueira e dedo-duro pra te contar da <b>Velha (Priscila)</b>:\n\n${fofocaVelha}\n\nEnquanto isso, você registrou <code>${infoGermano.qtdEnviosRecentes} lançamento(s)</code> recentemente e tá com seus contracheques em dia (${infoGermano.ultimoCC}). Pelo menos um humano nessa casa me mantém informada!\n\nMas não se ache muito: você já torrou <code>R$ ${formatar(infoGermano.totalGastos7d)}</code> essa semana. Vai lá cobrar a Velha pra mandar os comprovantes dela agora mesmo! 🐾💥`;
+    return `😼 <b>Miau, Germano!</b> Auditora oficial Azula na área!\n\nVim aqui cumprir meu papel sagrado de fofoqueira e dedo-duro pra te contar da <b>Véia (Mãe / Priscila)</b>:\n\n${fofocaVeia}\n\nEnquanto isso, você registrou <code>${infoGermano.qtdEnviosRecentes} lançamento(s)</code> recentemente e tá com seus contracheques em dia (${infoGermano.ultimoCC}). Pelo menos um humano nessa casa me mantém informada!\n\nMas não se ache muito: você já torrou <code>R$ ${formatar(infoGermano.totalGastos7d)}</code> essa semana. Vai lá cobrar a Véia pra mandar os comprovantes dela agora mesmo! 🐾💥`;
   } else {
     return `😼 <b>Miau, Priscila!</b> Põe meu sachê e presta atenção!\n\nPassando aqui pra puxar a sua orelha porque você tá com uma preguiça descomunal:\n\n• <b>Comprovantes:</b> Você <b>NÃO me manda nenhuma informação nova desde ${infoPriscila.dataUltimoEnvio}</b>! Sumiço total!\n• <b>Contracheques:</b> Seu último holerite registrado parou em <code>${infoPriscila.ultimoCC}</code>! Cadê os holerites de Julho e Agosto? Esqueceu que as contas continuam chegando?!\n• <b>E o Germano?</b> O Germano registrou <code>${infoGermano.qtdEnviosRecentes} lançamento(s)</code> recentemente e tá com os contracheques até ${infoGermano.ultimoCC} em dia!\n\nToma vergonha nessa cara e manda seus comprovantes e contracheques logo antes que eu derrube as coisas da mesa! 🐾💥`;
   }
@@ -267,7 +267,7 @@ export async function dispararFofocaSemanal(chatIdSolicitante?: number) {
 Você está enviando uma mensagem surpresa para ${user.nome} no Telegram no modo FOFOCA / DEDO-DURO.
 
 SITUAÇÃO ATUAL E REAL DAS INFORMAÇÕES NO SISTEMA:
-1. Priscila (a "Velha"):
+1. Priscila (a "Véia" ou "Mãe"):
    - Novos comprovantes/gastos enviados nos últimos 7 dias: ${infoPriscila.qtdEnviosRecentes} ${infoPriscila.qtdEnviosRecentes === 0 ? `(NÃO mandou NADA! O último envio dela foi em ${infoPriscila.dataUltimoEnvio}, quase 1 mês atrás!)` : `(Enviou ${infoPriscila.qtdEnviosRecentes}: ${infoPriscila.exemplosGastos})`}
    - Último contracheque/holerite cadastrado: ${infoPriscila.ultimoCC} (Está devendo os meses seguintes!)
    - Gasto registrado na semana: R$ ${infoPriscila.totalGastos7d.toFixed(2)}
@@ -280,8 +280,8 @@ SITUAÇÃO ATUAL E REAL DAS INFORMAÇÕES NO SISTEMA:
 INSTRUÇÕES OBRIGATÓRIAS:
 1. Mantenha a persona: Azula é uma gata irônica, mandona, ácida e cômica.
 2. Seja a DEDO DURO (snitch) número 1 da casa:
-   - Se falando com Germano: Foque em dedurar que a Priscila ("a Velha") NÃO MANDOU NENHUMA INFORMAÇÃO NOVA! Dedure que ela não manda comprovante desde ${infoPriscila.dataUltimoEnvio} e que o contracheque dela parou em ${infoPriscila.ultimoCC}. Elogie sarcasticamente o Germano por ter enviado coisas recentemente, mas mande ele cobrar a Velha imediatamente.
-   - Se falando com Priscila: Dê uma bronca épica e engraçada nela por estar há semanas sem mandar NADA (desde ${infoPriscila.dataUltimoEnvio}), estar devendo os contracheques recentes enquanto o Germano já enviou tudo. Mande ela mandar os comprovantes e holerites agora.
+   - Se falando com Germano: Foque em dedurar que a Priscila ("a Véia" ou "a Mãe") NÃO MANDOU NENHUMA INFORMAÇÃO NOVA! Dedure que ela não manda comprovante desde ${infoPriscila.dataUltimoEnvio} e que o contracheque dela parou em ${infoPriscila.ultimoCC}. Elogie sarcasticamente o Germano por ter enviado coisas recentemente, mas mande ele cobrar a Véia imediatamente. (IMPORTANTE: NUNCA chame a Priscila de "Velha"! Use sempre "Véia", "a Véia", "Mãe" ou "Mamãe").
+   - Se falando com Priscila: Trate-a com o humor da Azula chamando-a de "Mãe", "Mamãe" ou "Véia" (NUNCA use "Velha"). Dê uma bronca épica e engraçada nela por estar há semanas sem mandar NADA (desde ${infoPriscila.dataUltimoEnvio}), estar devendo os contracheques recentes enquanto o Germano já enviou tudo. Mande ela mandar os comprovantes e holerites agora.
 3. Formatação HTML estrita do Telegram: Use <b> para negrito e <code> para valores e datas. NUNCA use asteriscos (**) ou crases (\`).
 4. Mensagem direta, curta (3 a 4 parágrafos curtos) e sem preâmbulo.`;
 
@@ -307,7 +307,7 @@ INSTRUÇÕES OBRIGATÓRIAS:
   // Se foi disparado por um chat específico no Telegram, envia confirmação para quem pediu
   if (chatIdSolicitante) {
     const solicitante = users.find(u => Number(u.telegram_chat_id) === chatIdSolicitante);
-    const nomeOutro = solicitante?.email === 'germanorcarmo@gmail.com' ? 'a Velha (Priscila)' : 'o Germano';
+    const nomeOutro = solicitante?.email === 'germanorcarmo@gmail.com' ? 'a Véia / Mãe (Priscila)' : 'o Germano';
     await enviarMensagemTelegram(
       chatIdSolicitante,
       `😼 <b>Missão cumprida!</b> Além de te dedurar tudo aqui, acabei de mandar uma cobrança direta lá no Telegram d'${nomeOutro} puxando a orelha e exigindo os comprovantes e contracheques atrasados! muéhehehehe. 🐾`
