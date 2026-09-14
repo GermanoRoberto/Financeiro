@@ -563,11 +563,21 @@ function parseNubankLocal(text: string): any[] {
           if (!estabelecimento) estabelecimento = 'Estabelecimento';
         }
 
+        const estLower = estabelecimento.toLowerCase();
         if (isPixRecebido || isTransferenciaRecebida) {
           categoria = 'receita_extra';
-        } else if (estabelecimento.toLowerCase().includes('uber') || estabelecimento.toLowerCase().includes('99')) {
+        } else if (estLower.includes('shpp') || estLower.includes('shopee') || line.includes('38.372.267')) {
+          estabelecimento = 'Shopee';
+          categoria = 'outros';
+        } else if (estLower.includes('hotmart') || line.includes('13.427.325')) {
+          estabelecimento = 'Hotmart';
+          categoria = 'outros';
+        } else if (estLower.includes('ifood')) {
+          estabelecimento = 'iFood';
+          categoria = 'alimentação';
+        } else if (estLower.includes('uber') || estLower.includes('99')) {
           categoria = 'transporte';
-        } else if (estabelecimento.toLowerCase().includes('spotify') || estabelecimento.toLowerCase().includes('netflix')) {
+        } else if (estLower.includes('spotify') || estLower.includes('netflix')) {
           categoria = 'diversão';
         }
 
