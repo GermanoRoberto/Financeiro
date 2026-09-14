@@ -376,10 +376,13 @@ export async function extrairComFallback(base64: string, mimeType: string, promp
         }
       }
 
-      // 2. Extrato da Caixa em formato TXT/Texto
-      if (textToParse.includes('CAIXA') && (textToParse.includes('Extrato por período') || textToParse.includes('Lançamentos'))) {
-        console.log('Detectado Extrato Caixa em Texto! Processando localmente sem IA...');
-        const transacoes = parseCaixaTxtLocal(textToParse);
+      // 2. Extrato da Caixa (Formato TXT Internet Banking ou Formato Mobile App)
+      const isCaixaTxt = textToParse.includes('CAIXA') && (textToParse.includes('Extrato por período') || textToParse.includes('Lançamentos'));
+      const isCaixaMobile = (textToParse.includes('Extrato por Período') || textToParse.includes('Extrato por período')) && 
+                            (textToParse.includes('Deb Pix') || textToParse.includes('Credito Salario') || textToParse.includes('Saldo do dia') || textToParse.includes('CAIXA'));
+      if (isCaixaTxt || isCaixaMobile) {
+        console.log('Detectado Extrato Caixa! Processando localmente sem IA...');
+        const transacoes = isCaixaMobile ? parseCaixaMobileLocal(textToParse) : parseCaixaTxtLocal(textToParse);
         if (transacoes && transacoes.length > 0) {
           return {
             tipo_documento: 'extrato_bancario',
@@ -513,48 +516,51 @@ function parseNubankLocal(text: string): any[] {
             .replace(/Transferência enviada/gi, '')
             .trim();
 
-          // Regex atualizada para exigir vírgula antes dos centavos para evitar casar com CNPJs
-          const matchVal = cleanLine.match(/^(.*?)([\d\.]+(,\d{2}))$/);
-          if (matchVal) {
-            estabelecimento = matchVal[1].trim();
-            const valStr = matchVal[2].replace(/\./g, '').replace(',', '.');
+          // 1. Verificar se a linha termina com CNPJ raiz + valor concatenado (Ex: 38.372.26767,80)
+          const cnpjValMatch = cleanLine.match(/^(.*?)(\d{2}\.\d{3}\.\d{3})(\d+,\d{2})$/);
+          if (cnpjValMatch) {
+            estabelecimento = cnpjValMatch[1].trim();
+            const valStr = cnpjValMatch[3].replace(',', '.');
             valor = parseFloat(valStr);
-            
-            estabelecimento = estabelecimento
-              .replace(/^-/, '')
-              .replace(/-\s*•••\..*$/, '')
-              .replace(/via\s*Open Banking/gi, '')
-              .trim();
-              
-            if (!estabelecimento) estabelecimento = 'Estabelecimento';
           } else {
-            // Se a linha não casar com valor porque o valor quebrou para a linha seguinte
-            // (Ex: o CNPJ ficou na linha atual e o valor ficou na próxima linha)
-            // Vamos verificar as próximas 3 linhas para encontrar o valor correto
-            for (let k = 1; k <= 3; k++) {
-              const nextLine = lines[j + k];
-              if (nextLine && nextLine.match(/^\s*([\d\.]+,?\d{2})\s*$/)) {
-                const nextValMatch = nextLine.match(/^\s*([\d\.]+,?\d{2})\s*$/);
-                if (nextValMatch) {
-                  const valStr = nextValMatch[1].replace(/\./g, '').replace(',', '.');
-                  valor = parseFloat(valStr);
-                  
-                  // Limpa a descrição da linha atual
-                  let desc = cleanLine
-                    .replace(/^-/, '')
-                    .replace(/-\s*•••\..*$/, '')
-                    .replace(/via\s*Open Banking/gi, '')
-                    .trim();
-                  
-                  // Remove pedaços de CNPJ que sobraram no fim do nome
-                  desc = desc.replace(/\s*-\s*\d{2}\.\d{3}\.\d{3}$/, '').trim();
-                  
-                  estabelecimento = desc || 'Estabelecimento';
-                  break;
+            // 2. Formato normal: descrição + valor monetário
+            const matchVal = cleanLine.match(/^(.*?)([\d\.]+(,\d{2}))$/);
+            if (matchVal) {
+              estabelecimento = matchVal[1].trim();
+              const valStr = matchVal[2].replace(/\./g, '').replace(',', '.');
+              valor = parseFloat(valStr);
+            } else {
+              // 3. Se o valor quebrou para as próximas linhas
+              for (let k = 1; k <= 3; k++) {
+                const nextLine = lines[j + k];
+                if (nextLine && nextLine.match(/^\s*([\d\.]+,?\d{2})\s*$/)) {
+                  const nextValMatch = nextLine.match(/^\s*([\d\.]+,?\d{2})\s*$/);
+                  if (nextValMatch) {
+                    const valStr = nextValMatch[1].replace(/\./g, '').replace(',', '.');
+                    valor = parseFloat(valStr);
+                    let desc = cleanLine
+                      .replace(/^-/, '')
+                      .replace(/-\s*•••\..*$/, '')
+                      .replace(/via\s*Open Banking/gi, '')
+                      .trim();
+                    desc = desc.replace(/\s*-\s*\d{2}\.\d{3}\.\d{3}$/, '').trim();
+                    estabelecimento = desc || 'Estabelecimento';
+                    break;
+                  }
                 }
               }
             }
           }
+
+          estabelecimento = estabelecimento
+            .replace(/^-/, '')
+            .replace(/-\s*•••\..*$/, '')
+            .replace(/via\s*Open Banking/gi, '')
+            .replace(/\s*-\s*\d{2}\.\d{3}\.\d{3}.*$/, '')
+            .replace(/\s*-\s*$/, '')
+            .trim();
+            
+          if (!estabelecimento) estabelecimento = 'Estabelecimento';
         }
 
         if (isPixRecebido || isTransferenciaRecebida) {
@@ -565,7 +571,8 @@ function parseNubankLocal(text: string): any[] {
           categoria = 'diversão';
         }
 
-        if (valor > 0) {
+        // Sanity check: se valor for absurdo (> 50.000) de um extrato pessoal, ignorar erro de OCR/regex
+        if (valor > 0 && valor < 50000) {
           transactions.push({
             data: formattedDate,
             valor: valor,
@@ -671,6 +678,92 @@ function parseCaixaTxtLocal(text: string): any[] {
       }
     }
   }
+  return transactions;
+}
+
+function parseCaixaMobileLocal(text: string): any[] {
+  const isCaixaMobile = (text.includes('Extrato por Período') || text.includes('Extrato por período')) && 
+                        (text.includes('Deb Pix') || text.includes('Credito Salario') || text.includes('Saldo do dia'));
+  if (!isCaixaMobile) return [];
+
+  const yearMatch = text.match(/\bde\s+(\d{4})\b/i);
+  const ano = yearMatch ? yearMatch[1] : '2026';
+
+  const meses: Record<string, string> = {
+    'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05', 'JUN': '06',
+    'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12'
+  };
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const transactions: any[] = [];
+
+  let startIndex = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === 'Voltar' || lines[i] === 'Compartilhar') {
+      startIndex = i + 1;
+    }
+  }
+
+  let descBuffer: string[] = [];
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.includes('Saldo do dia') || line.includes('Saldo Anterior')) {
+      descBuffer = [];
+      if (i + 1 < lines.length && lines[i + 1].match(/^-?R\$\s*[\d\.,]+/)) {
+        i++;
+      }
+      continue;
+    }
+
+    const valMatch = line.match(/^(-)?R\$\s*([\d\.,]+)$/);
+    if (valMatch) {
+      const isNegativo = !!valMatch[1];
+      const valStr = valMatch[2].replace(/\./g, '').replace(',', '.');
+      const valor = parseFloat(valStr);
+
+      let dataTransacao = '';
+      if (i + 1 < lines.length && lines[i + 1].match(/^(\d{2})([A-Z]{3})$/i)) {
+        i++;
+        const dateMatch = lines[i].match(/^(\d{2})([A-Z]{3})$/i);
+        if (dateMatch) {
+          const dia = dateMatch[1];
+          const mesStr = dateMatch[2].toUpperCase();
+          const mesNum = meses[mesStr] || '09';
+          dataTransacao = `${ano}-${mesNum}-${dia}`;
+        }
+      }
+
+      let desc = descBuffer.join(' ').trim();
+      descBuffer = [];
+
+      if (desc && valor > 0 && valor < 50000) {
+        let categoria = 'outros';
+        if (!isNegativo || desc.toLowerCase().includes('credito salario') || desc.toLowerCase().includes('pix recebido') || desc.toLowerCase().includes('deposito')) {
+          categoria = 'receita_extra';
+        } else if (desc.toLowerCase().includes('drogaria') || desc.toLowerCase().includes('farmacia')) {
+          categoria = 'saude';
+        } else if (desc.toLowerCase().includes('padaria') || desc.toLowerCase().includes('doces') || desc.toLowerCase().includes('lanchonete') || desc.toLowerCase().includes('restaurante')) {
+          categoria = 'alimentacao';
+        } else if (desc.toLowerCase().includes('prestacao hab') || desc.toLowerCase().includes('habitacao')) {
+          categoria = 'moradia';
+        } else if (desc.toLowerCase().includes('juros') || desc.toLowerCase().includes('iof')) {
+          categoria = 'taxas_bancarias';
+        }
+
+        transactions.push({
+          data: dataTransacao || `${ano}-09-01`,
+          valor: valor,
+          estabelecimento: desc,
+          categoria: categoria
+        });
+      }
+    } else {
+      descBuffer.push(line);
+    }
+  }
+
   return transactions;
 }
 
@@ -813,45 +906,108 @@ function parseContrachequePjfLocal(text: string): any {
 
   const parseMoeda = (s?: string) => s ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : 0;
 
-  const refMatch = text.match(/(?:Mês\/Ano|Referência|Competência):?\s*(\d{2})\/(\d{4})/i);
-  const mesReferencia = refMatch ? `${refMatch[2]}-${refMatch[1]}` : new Date().toISOString().substring(0, 7);
+  // 1. Mês de referência: "Agosto de 2026" ou "08/2026"
+  const mesesExtenso: Record<string, string> = {
+    'janeiro': '01', 'fevereiro': '02', 'março': '03', 'abril': '04',
+    'maio': '05', 'junho': '06', 'julho': '07', 'agosto': '08',
+    'setembro': '09', 'outubro': '10', 'novembro': '11', 'dezembro': '12'
+  };
 
+  let mesReferencia = '';
+  const refExtensoMatch = text.match(/(?:Janeiro|Fevereiro|Março|Abril|Maio|Junho|Julho|Agosto|Setembro|Outubro|Novembro|Dezembro)\s+de\s+(\d{4})/i);
+  if (refExtensoMatch) {
+    const nomeMes = refExtensoMatch[0].split(/\s+de\s+/i)[0].toLowerCase();
+    const ano = refExtensoMatch[1];
+    const numMes = mesesExtenso[nomeMes] || '08';
+    mesReferencia = `${ano}-${numMes}`;
+  } else {
+    const refMatch = text.match(/(?:Mês\/Ano|Referência|Competência):?\s*(\d{2})\/(\d{4})/i);
+    mesReferencia = refMatch ? `${refMatch[2]}-${refMatch[1]}` : new Date().toISOString().substring(0, 7);
+  }
+
+  // 2. Totais do rodapé
   const provMatch = text.match(/(?:Total de Vencimentos|Total de Proventos|Proventos):?\s*R?\$?\s*([\d\.,]+)/i);
-  const descMatch = text.match(/(?:Total de Descontos|Descontos):?\s*R?\$?\s*([\d\.,]+)/i);
+  const descMatch = text.match(/(?:Total de Descontos|Descontos):?\s*R?\$?\s*([\d\.,]+)/i) ||
+                    text.match(/([\d\.,]+)\s*\n\s*TOTAL DE DESCONTOS/i);
   const liqMatch = text.match(/(?:Líquido a Receber|Total Líquido|Valor Líquido):?\s*R?\$?\s*([\d\.,]+)/i);
 
-  const salarioBruto = parseMoeda(provMatch?.[1]);
-  const totalDescontos = parseMoeda(descMatch?.[1]);
-  const salarioLiquido = parseMoeda(liqMatch?.[1]);
+  let salarioBruto = parseMoeda(provMatch?.[1]);
+  let totalDescontos = parseMoeda(descMatch?.[1]);
+  let salarioLiquido = parseMoeda(liqMatch?.[1]);
 
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const proventos: any[] = [];
   const descontos: any[] = [];
+  const contratos: any[] = [];
+
+  // Regex tolerante a concatenação de colunas sem espaços (Betha Cloud / PJF)
+  // Ex: 1SALARIO145,00006.078,26
+  // Ex: 56FPM (FOLHA)14,0000880,30
+  // Ex: 665EMPRÉSTIMO CEF2.200,28002.200,28
+  const eventRegex = /^(\d+)\s*([A-ZÀ-Ú\s\.\-\/\(\)]+?)\s*((?:\d{1,3}(?:\.\d{3})*|\d+),\d{2,4})\s*((?:\d{1,3}(?:\.\d{3})*|\d+),\d{2})$/;
 
   for (const line of lines) {
-    const m = line.match(/^(\d+)\s+([A-ZÀ-Ú0-9\.\s\/\-\(\)]+?)\s+(\d+,\d{2,4})\s+([\d\.,]+)$/);
+    const m = line.match(eventRegex);
     if (m) {
       const desc = m[2].trim();
       const val = parseMoeda(m[4]);
-      if (val > 0) {
-        descontos.push({
-          tipo: desc,
-          valor: val,
-          parcela_atual: null,
-          parcela_total: null,
-          recorrente: true
-        });
+
+      // Distinção precisa entre Desconto e Provento
+      const isDescontoExplicit = desc.includes('FPM') || desc.includes('IRRF') || desc.includes('PREV') || 
+                                 desc.includes('EMPRÉSTIMO') || desc.includes('EMPRESTIMO') || 
+                                 desc.includes('CONSIGNADO') || desc.includes('FALTAS') || 
+                                 desc.includes('CEF') || desc.includes('SINDICATO') || desc.includes('SEGURO');
+
+      if (isDescontoExplicit) {
+        if (val > 0) {
+          const isEmprestimo = desc.includes('EMPRÉSTIMO') || desc.includes('EMPRESTIMO') || desc.includes('CONSIGNADO');
+          descontos.push({
+            tipo: desc,
+            valor: val,
+            parcela_atual: null,
+            parcela_total: null,
+            recorrente: true
+          });
+
+          if (isEmprestimo) {
+            contratos.push({
+              banco: desc.includes('CEF') ? 'Caixa Econômica' : 'Banco Consignado',
+              descricao: desc,
+              valor_parcela: val,
+              parcela_atual: null,
+              parcela_total: null
+            });
+          }
+        }
+      } else {
+        if (val > 0) {
+          proventos.push({
+            tipo: desc,
+            valor: val
+          });
+        }
       }
     }
   }
+
+  const somaProventos = proventos.reduce((acc, p) => acc + p.valor, 0);
+  const somaDescontos = descontos.reduce((acc, d) => acc + d.valor, 0);
+
+  if (!salarioBruto && somaProventos > 0) salarioBruto = somaProventos;
+  if (!totalDescontos && somaDescontos > 0) totalDescontos = somaDescontos;
+  if (!salarioLiquido && salarioBruto > 0) salarioLiquido = Math.round((salarioBruto - totalDescontos) * 100) / 100;
 
   return {
     tipo_documento: 'contracheque',
     nome_funcionario: 'PRISCILA APARECIDA DA SILVA TOLEDO',
     is_adiantamento: false,
-    salario_bruto: salarioBruto || (salarioLiquido + totalDescontos),
+    salario_bruto: salarioBruto,
+    total_descontos: totalDescontos,
     salario_liquido: salarioLiquido,
     mes_referencia: mesReferencia,
-    descontos: descontos
+    proventos: proventos,
+    descontos: descontos,
+    contratos_emprestimo: contratos
   };
 }
 

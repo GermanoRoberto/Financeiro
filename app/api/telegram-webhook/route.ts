@@ -344,14 +344,6 @@ async function handleCallbackQuery(callbackQuery: any) {
 }
 
 function obterFalaAzula(falaBase: string): string {
-  const rand = Math.random();
-  const expressoesRapidas = ['Bué!', 'Bé!', 'Vuiishh!', 'Iiiiiishh!', 'Hm.'];
-  
-  // 15% de chance da resposta ser apenas uma expressão rápida se for uma fala comum e não um relatório estruturado
-  if (rand < 0.15 && !falaBase.includes('<b>Seu Resumo</b>') && !falaBase.includes('<b>Suas Dívidas</b>') && !falaBase.includes('contracheque de') && !falaBase.includes('Gasto de R$')) {
-    return `😼 ${expressoesRapidas[Math.floor(Math.random() * expressoesRapidas.length)]}`;
-  }
-
   let texto = falaBase;
   
   // 20% de chance de adicionar interjeições ou pedido de papa no final
@@ -1050,9 +1042,10 @@ REGRAS CRÍTICAS DE VALIDAÇÃO MATEMÁTICA E LAYOUT:
         }
       }
 
+      const totalValor = transacoes.reduce((acc: number, t: any) => acc + (Number(t.valor) || 0), 0);
       await enviarMensagem(
         chatId,
-        obterFalaAzula(`😼 Li o seu extrato bancário! Consegui registrar <b>${totalRegistradas} novas transações</b> (de um total de ${transacoes.length} encontradas) diretamente no seu painel. Menos trabalho para vocês, muéhehehehe!`)
+        obterFalaAzula(`😼 Li o seu extrato bancário! Consegui registrar <b>${totalRegistradas} novas transações</b> (de um total de ${transacoes.length} encontradas, somando R$ ${totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) diretamente no seu painel. Menos trabalho para vocês, muéhehehehe!`)
       );
     } else if (extracao.tipo_documento === 'comprovante_gasto') {
       const isReceita = extracao.categoria === 'receita_extra';
