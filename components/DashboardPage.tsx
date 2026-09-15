@@ -424,10 +424,12 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                 />
               )}
 
-              {/* Acerto de Contas do Casal (Rateio 50/50 e Resumo WhatsApp) - Ativo na visão Casal */}
+              {/* Acerto de Contas do Casal (Rateio 50/50 com Folha + Extratos) - Ativo na visão Casal */}
               {visao === 'casal' && (
                 <AcertoContasCasal
                   gastos={_gastos}
+                  descontos={descontos}
+                  contracheques={contracheques}
                   usuario={usuario}
                   usuarioEsposa={usuarioEsposa}
                 />
