@@ -19,6 +19,7 @@ import PainelEmprestimos from '@/components/PainelEmprestimos';
 import RelatorioMensal from '@/components/RelatorioMensal';
 import EstudoRecuperacao from '@/components/EstudoRecuperacao';
 import PainelCasalPendente from '@/components/PainelCasalPendente';
+import AcertoContasCasal from '@/components/AcertoContasCasal';
 import toast from 'react-hot-toast';
 
 type Visao = 'casal' | 'voce' | 'esposa';
@@ -103,6 +104,28 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
     }
   };
 
+  const isEncargoLegal = (tipo?: string) => {
+    if (!tipo) return false;
+    const t = tipo.toLowerCase();
+    return (
+      t.includes('inss') ||
+      t.includes('irrf') ||
+      t.includes('imposto') ||
+      t.includes('previd') ||
+      t.includes('rpps') ||
+      t.includes('pensao') ||
+      t.includes('pensão') ||
+      t.includes('falta') ||
+      t.includes('atraso') ||
+      t.includes('sindic') ||
+      t.includes('unimed') ||
+      t.includes('saude') ||
+      t.includes('saúde') ||
+      t.includes('plano') ||
+      t.includes('odonto')
+    );
+  };
+
   const usuarioAtivo = visao === 'esposa' && usuarioEsposa ? usuarioEsposa : usuario;
 
   // 1. Identificar contracheque mais recente de cada cônjuge
@@ -139,12 +162,11 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   // Obter o contracheque mais recente de cada pessoa relevante para o resumo atual
   let contrachequesMesAtual: Contracheque[] = [];
   if (visao === 'casal') {
-    if (casalSincronizado && ccMaisRecenteVoce && ccMaisRecenteEsposa) {
-      contrachequesMesAtual = [ccMaisRecenteVoce, ccMaisRecenteEsposa];
-    } else {
-      // Bloqueado por assimetria: não consolida números divergentes
-      contrachequesMesAtual = [];
-    }
+    // Reconciliação suave: consolida os holerites mais recentes de ambos (mesmo se meses divergentes)
+    contrachequesMesAtual = [
+      ...(ccMaisRecenteVoce ? [ccMaisRecenteVoce] : []),
+      ...(ccMaisRecenteEsposa ? [ccMaisRecenteEsposa] : []),
+    ];
   } else if (visao === 'voce') {
     contrachequesMesAtual = ccMaisRecenteVoce ? [ccMaisRecenteVoce] : [];
   } else {
@@ -387,7 +409,8 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
           {abaAtiva === 'dashboard' && (
             <div className="space-y-8 animate-fadeIn">
               
-              {visao === 'casal' && !casalSincronizado ? (
+              {/* Banner de Reconciliação Suave caso meses sejam divergentes na visão casal */}
+              {visao === 'casal' && !casalSincronizado && (
                 <PainelCasalPendente
                   usuario={usuario}
                   usuarioEsposa={usuarioEsposa}
@@ -399,49 +422,58 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                   onVerEsposa={() => setVisao('esposa')}
                   onIrContracheque={() => setAbaAtiva('contracheque')}
                 />
-              ) : (
-                <>
-                  {/* Seção de Resumos - Grid de Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <ResumoCard
-                      titulo="Salário Bruto"
-                      valor={salarioBruto}
-                      cor="blue"
-                    />
-                    <ResumoCard
-                      titulo="Salário Líquido"
-                      valor={salarioLiquido}
-                      cor="green"
-                    />
-                    <ResumoCard
-                      titulo="Comprometimento"
-                      valor={comprometimento}
-                      sufixo="%"
-                      cor={comprometimento > 50 ? 'red' : comprometimento > 30 ? 'yellow' : 'green'}
-                    />
-                  </div>
-
-                  {/* Seção de Gráficos */}
-                  <GraficosFinanceiros projecao={projecao} />
-
-                  {/* Estudo de Recuperação (Cenários e Alertas) */}
-                  <EstudoRecuperacao
-                    transacoes={_gastos}
-                    contracheques={contracheques}
-                    descontos={descontos}
-                    dividas={dividas}
-                    usuario={usuario}
-                    usuarioEsposa={usuarioEsposa}
-                    visao={visao}
-                    casalSincronizado={casalSincronizado}
-                    mesVoce={formatarMesAno(mesVoceStr)}
-                    mesEsposa={formatarMesAno(mesEsposaStr)}
-                  />
-
-                  {/* Tabela de Prospecção */}
-                  <TabMeses projecao={projecao} />
-                </>
               )}
+
+              {/* Acerto de Contas do Casal (Rateio 50/50 e Resumo WhatsApp) - Ativo na visão Casal */}
+              {visao === 'casal' && (
+                <AcertoContasCasal
+                  gastos={_gastos}
+                  usuario={usuario}
+                  usuarioEsposa={usuarioEsposa}
+                />
+              )}
+
+              {/* Seção de Resumos - Grid de Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <ResumoCard
+                  titulo="Salário Bruto"
+                  valor={salarioBruto}
+                  cor="blue"
+                  subtitulo={visao === 'casal' && !casalSincronizado ? 'Estimativa combinada' : undefined}
+                />
+                <ResumoCard
+                  titulo="Salário Líquido"
+                  valor={salarioLiquido}
+                  cor="green"
+                  subtitulo={visao === 'casal' && !casalSincronizado ? 'Estimativa combinada' : undefined}
+                />
+                <ResumoCard
+                  titulo="Comprometimento"
+                  valor={comprometimento}
+                  sufixo="%"
+                  cor={comprometimento > 50 ? 'red' : comprometimento > 30 ? 'yellow' : 'green'}
+                />
+              </div>
+
+              {/* Seção de Gráficos */}
+              <GraficosFinanceiros projecao={projecao} />
+
+              {/* Estudo de Recuperação (Cenários e Alertas) */}
+              <EstudoRecuperacao
+                transacoes={_gastos}
+                contracheques={contracheques}
+                descontos={descontos}
+                dividas={dividas}
+                usuario={usuario}
+                usuarioEsposa={usuarioEsposa}
+                visao={visao}
+                casalSincronizado={casalSincronizado}
+                mesVoce={formatarMesAno(mesVoceStr)}
+                mesEsposa={formatarMesAno(mesEsposaStr)}
+              />
+
+              {/* Tabela de Prospecção */}
+              <TabMeses projecao={projecao} />
 
               {/* Listagem de Transações do Dia a Dia + Lançamento Manual */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
@@ -551,25 +583,26 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                         </table>
                       </div>
 
-                      {/* Visualização de Cards para Mobile */}
-                      <div className="block sm:hidden space-y-4">
+                      {/* Visualização de Cards para Mobile (Ergonômico WCAG 2.1 AA) */}
+                      <div className="block sm:hidden space-y-3.5">
                         {gastosExibidos.map((g) => {
-                          const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome || 'Esposa');
+                          const dono = g.usuario_id === usuario.id ? 'Você' : (usuarioEsposa?.nome ? usuarioEsposa.nome.split(' ')[0] : 'Esposa');
                           const dataFormatada = new Date(g.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
                           
                           const isReceita = g.categoria === 'receita_extra';
                           const isTransf = g.categoria === 'transferencia';
 
                           return (
-                            <div key={g.id} className="bg-slate-900/40 border border-white/10 rounded-2xl p-4 space-y-3">
-                              <div className="flex justify-between items-start gap-2">
-                                <div>
-                                  <h4 className="font-semibold text-white capitalize text-sm truncate max-w-[170px]" title={g.estabelecimento || ''}>
+                            <div key={g.id} className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 space-y-3 shadow-md backdrop-blur-md">
+                              {/* Top: Estabelecimento e Valor */}
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="space-y-0.5 flex-1 min-w-0">
+                                  <h4 className="font-bold text-white capitalize text-sm sm:text-base truncate" title={g.estabelecimento || ''}>
                                     {g.estabelecimento || 'Não identificado'}
                                   </h4>
-                                  <span className="text-[10px] text-slate-400">{dataFormatada}</span>
+                                  <span className="text-xs text-slate-400 font-medium">{dataFormatada}</span>
                                 </div>
-                                <span className={`text-sm font-bold ${
+                                <span className={`text-base font-extrabold font-mono tabular-nums whitespace-nowrap ${
                                   isReceita 
                                     ? 'text-emerald-400' 
                                     : isTransf 
@@ -580,12 +613,41 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                 </span>
                               </div>
 
-                              <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                                <div className="flex items-center gap-1.5">
+                              {/* Badges de Quem Gastou e Status */}
+                              <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/5">
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 ${
+                                  g.usuario_id === usuario.id 
+                                    ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30' 
+                                    : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                                }`}>
+                                  <span>{g.usuario_id === usuario.id ? '👤' : '👩'}</span>
+                                  <span>{dono}</span>
+                                </span>
+
+                                <div className="flex items-center gap-2">
+                                  {g.confirmado ? (
+                                    <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                      ✓ Confirmado
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => confirmarGasto(g.id)}
+                                      className="text-xs px-3 py-1.5 min-h-[36px] rounded-xl font-bold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>⚡</span>
+                                      <span>Confirmar</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Rodapé: Seletor de Categoria e Botão Excluir com Touch Targets Adequados */}
+                              <div className="flex items-center gap-2 pt-1">
+                                <div className="flex-1">
                                   <select
                                     value={g.categoria || 'outros'}
                                     onChange={(e) => alterarCategoriaGasto(g.id, e.target.value)}
-                                    className="bg-slate-950 border border-white/10 rounded-xl px-1.5 py-1 text-[10px] text-slate-300 focus:outline-none cursor-pointer font-medium"
+                                    className="w-full bg-slate-950/80 border border-white/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer font-medium min-h-[42px]"
                                   >
                                     <option value="alimentação">🍔 Alimentação</option>
                                     <option value="transporte">🚗 Transporte</option>
@@ -596,42 +658,20 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                     <option value="compras">🛍️ Compras</option>
                                     <option value="serviços">🛠️ Assinaturas</option>
                                     <option value="investimentos">📈 Investimentos</option>
-                                    <option value="receita_extra">💰 Receita</option>
-                                    <option value="transferencia">🔄 Transf.</option>
+                                    <option value="receita_extra">💰 Receita Extra</option>
+                                    <option value="transferencia">🔄 Transferência</option>
                                     <option value="outros">📦 Outros</option>
                                   </select>
-
-                                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${
-                                    g.usuario_id === usuario.id 
-                                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
-                                      : 'bg-pink-500/10 text-pink-400 border border-pink-500/20'
-                                  }`}>
-                                    {dono}
-                                  </span>
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                  {!g.confirmado && (
-                                    <button
-                                      onClick={() => confirmarGasto(g.id)}
-                                      className="text-[10px] px-2 py-1 rounded-lg font-semibold bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 active:scale-95 transition-all"
-                                    >
-                                      Confirmar
-                                    </button>
-                                  )}
-                                  {g.confirmado && (
-                                    <span className="text-[9px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                      OK
-                                    </span>
-                                  )}
-                                  <button
-                                    onClick={() => excluirGasto(g.id)}
-                                    className="p-1 text-slate-400 hover:text-red-400 transition-colors"
-                                    title="Excluir Lançamento"
-                                  >
-                                    🗑️
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={() => excluirGasto(g.id)}
+                                  className="min-w-[42px] min-h-[42px] p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-white/10 rounded-xl transition-all flex items-center justify-center text-sm cursor-pointer active:scale-95"
+                                  title="Excluir Lançamento"
+                                  aria-label="Excluir Lançamento"
+                                >
+                                  🗑️
+                                </button>
                               </div>
                             </div>
                           );
@@ -683,7 +723,11 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                             timeZone: 'UTC'
                           });
                           const descontosCc = descontos.filter(d => d.contracheque_id === cc.id);
-                          const totalDescontosCc = descontosCc.reduce((acc, d) => acc + (d.valor || 0), 0);
+                          const encargosLegais = descontosCc.filter(d => isEncargoLegal(d.tipo));
+                          const consignadosEmprestimos = descontosCc.filter(d => !isEncargoLegal(d.tipo));
+                          const totalEncargos = encargosLegais.reduce((acc, d) => acc + (d.valor || 0), 0);
+                          const totalConsignados = consignadosEmprestimos.reduce((acc, d) => acc + (d.valor || 0), 0);
+                          const totalDescontosCc = totalEncargos + totalConsignados;
                           const isExpandido = !!contrachequesExpandidos[cc.id];
 
                           return (
@@ -703,20 +747,20 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                     </span>
                                   </div>
                                   <div className="text-xs text-slate-400">
-                                    Salário Base / Líquido e {descontosCc.length} descontos
+                                    Salário Base / Líquido • {encargosLegais.length} encargos legais • {consignadosEmprestimos.length} consignados
                                   </div>
                                 </div>
 
                                 <div className="flex items-center gap-6 self-end sm:self-auto">
                                   <div className="text-right">
                                     <div className="text-xs text-slate-400">Líquido</div>
-                                    <div className="text-sm font-bold text-emerald-400">
+                                    <div className="text-sm font-bold text-emerald-400 font-mono tabular-nums">
                                       R$ {cc.salario_liquido?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     </div>
                                   </div>
                                   <div className="text-right">
                                     <div className="text-xs text-slate-400">Bruto</div>
-                                    <div className="text-sm font-bold text-slate-300">
+                                    <div className="text-sm font-bold text-slate-300 font-mono tabular-nums">
                                       R$ {cc.salario_bruto?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     </div>
                                   </div>
@@ -741,34 +785,86 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                               </div>
 
                               {isExpandido && (
-                                <div className="px-5 pb-5 pt-2 border-t border-white/5 bg-slate-950/20">
-                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalhamento de Descontos</h4>
+                                <div className="px-5 pb-5 pt-3 border-t border-white/5 bg-slate-950/40 space-y-4">
                                   {descontosCc.length === 0 ? (
                                     <p className="text-xs text-slate-500">Sem descontos registrados neste contracheque.</p>
                                   ) : (
-                                    <div className="divide-y divide-white/5">
-                                      {descontosCc.map((d) => (
-                                        <div key={d.id} className="py-2.5 flex items-center justify-between text-sm">
-                                          <div className="space-y-0.5">
-                                            <span className="font-semibold text-slate-200 capitalize">{d.tipo}</span>
-                                            {d.parcela_atual && d.parcela_total && (
-                                              <span className="ml-2 text-xs text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded">
-                                                Parc. {d.parcela_atual}/{d.parcela_total}
-                                              </span>
-                                            )}
+                                    <>
+                                      {/* Grupo 1: Encargos Legais & Estatutários */}
+                                      <div className="bg-slate-900/40 border border-white/5 rounded-xl p-4 space-y-2">
+                                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm">⚖️</span>
+                                            <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                                              Encargos Legais & Previdenciários
+                                            </h4>
                                           </div>
-                                          <span className="font-bold text-rose-400">
-                                            R$ {d.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                          <span className="text-xs font-bold font-mono text-amber-400 tabular-nums">
+                                            Subtotal: R$ {totalEncargos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                           </span>
                                         </div>
-                                      ))}
-                                      <div className="pt-3 flex justify-between text-sm font-bold text-slate-300">
-                                        <span>Total Descontos</span>
-                                        <span className="text-rose-400">
+
+                                        {encargosLegais.length === 0 ? (
+                                          <p className="text-xs text-slate-500 py-1">Nenhum encargo legal registrado.</p>
+                                        ) : (
+                                          <div className="divide-y divide-white/5">
+                                            {encargosLegais.map((d) => (
+                                              <div key={d.id} className="py-2 flex items-center justify-between text-xs sm:text-sm">
+                                                <span className="font-medium text-slate-200 capitalize">{d.tipo}</span>
+                                                <span className="font-semibold text-amber-300 font-mono tabular-nums">
+                                                  - R$ {d.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Grupo 2: Empréstimos & Consignados em Folha */}
+                                      <div className="bg-slate-900/40 border border-white/5 rounded-xl p-4 space-y-2">
+                                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm">🏦</span>
+                                            <h4 className="text-xs font-bold text-rose-300 uppercase tracking-wider">
+                                              Empréstimos, Consignados & Retenções
+                                            </h4>
+                                          </div>
+                                          <span className="text-xs font-bold font-mono text-rose-400 tabular-nums">
+                                            Subtotal: R$ {totalConsignados.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                          </span>
+                                        </div>
+
+                                        {consignadosEmprestimos.length === 0 ? (
+                                          <p className="text-xs text-slate-500 py-1">Nenhum consignado ou retenção financeira em folha.</p>
+                                        ) : (
+                                          <div className="divide-y divide-white/5">
+                                            {consignadosEmprestimos.map((d) => (
+                                              <div key={d.id} className="py-2 flex items-center justify-between text-xs sm:text-sm">
+                                                <div className="space-y-0.5 flex items-center gap-2">
+                                                  <span className="font-medium text-slate-200 capitalize">{d.tipo}</span>
+                                                  {d.parcela_atual && d.parcela_total && (
+                                                    <span className="text-[11px] text-slate-300 bg-white/10 px-2 py-0.5 rounded-full font-mono">
+                                                      Parc. {d.parcela_atual}/{d.parcela_total}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <span className="font-semibold text-rose-400 font-mono tabular-nums">
+                                                  - R$ {d.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Totalizador Consolidado */}
+                                      <div className="pt-2 flex justify-between items-center text-sm font-bold text-slate-200 px-1">
+                                        <span>Total Retido em Folha:</span>
+                                        <span className="text-rose-400 font-mono tabular-nums text-base">
                                           R$ {totalDescontosCc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </span>
                                       </div>
-                                    </div>
+                                    </>
                                   )}
                                 </div>
                               )}

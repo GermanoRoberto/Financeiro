@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState } from 'react';
 import { Usuario } from '@/lib/types';
 import { formatarBRL } from '@/lib/money';
 
@@ -26,131 +27,121 @@ export default function PainelCasalPendente({
   onVerEsposa,
   onIrContracheque,
 }: PainelCasalPendenteProps) {
+  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+
   const nomeEsposa = usuarioEsposa?.nome || 'Parceiro(a)';
   const primeiroNomeEsposa = nomeEsposa.split(' ')[0];
+  const nomeVoce = usuario.nome || 'Você';
+  const primeiroNomeVoce = nomeVoce.split(' ')[0];
 
   return (
-    <div className="bg-slate-900/80 border border-amber-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden space-y-6">
-      {/* Glow de Alerta no Fundo */}
-      <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full filter blur-[80px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full filter blur-[80px] pointer-events-none" />
+    <div className="bg-gradient-to-r from-amber-950/40 via-slate-900/80 to-blue-950/40 border border-amber-500/30 rounded-3xl p-5 sm:p-6 backdrop-blur-xl shadow-xl relative overflow-hidden space-y-4">
+      {/* Glow de fundo */}
+      <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/10 rounded-full filter blur-[70px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-72 h-72 bg-blue-500/10 rounded-full filter blur-[70px] pointer-events-none" />
 
-      {/* Header com Ícone de Bloqueio e Título */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6 relative z-10">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl flex-shrink-0 shadow-lg shadow-amber-500/10">
-            🔒
+      {/* Banner Superior Principal */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xl flex-shrink-0 shadow-md">
+            ⚡
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Painel Consolidado do Casal Travado
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                Reconciliação Contínua do Casal
               </h3>
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-                Sincronização Pendente
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Meses Divergentes (Estimativa Ativa)
               </span>
             </div>
-            <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-              Para garantir a <strong>governança financeira e evitar projeções ilusórias</strong>, o painel conjunto do casal só consolida números quando ambos os cônjuges estiverem no <strong>mesmo mês de referência ativo</strong> e com seus rendimentos e dívidas cadastrados.
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
+              O painel conjunto está <strong>totalmente liberado</strong> com base nos últimos contracheques cadastrados ({primeiroNomeVoce}: <span className="text-blue-300 font-semibold">{mesVoce || 'N/D'}</span> | {primeiroNomeEsposa}: <span className="text-purple-300 font-semibold">{mesEsposa || 'N/D'}</span>).
             </p>
           </div>
         </div>
+
+        {/* Botões de Ação Rápida */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
+          <button
+            onClick={onIrContracheque}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer flex items-center gap-1.5"
+          >
+            <span>📄</span>
+            <span>Atualizar Holerite de {primeiroNomeEsposa}</span>
+          </button>
+          <button
+            onClick={() => setDetalhesAbertos(!detalhesAbertos)}
+            className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-all flex items-center gap-1"
+          >
+            <span>{detalhesAbertos ? 'Ocultar' : 'Comparar'}</span>
+            <span className="transform transition-transform text-[10px]" style={{ display: 'inline-block', transform: detalhesAbertos ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          </button>
+        </div>
       </div>
 
-      {/* Diagnóstico de Paridade Lado a Lado */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 relative z-10">
-        
-        {/* Card Usuário Ativo (Você) */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">👤</span>
-              <span className="font-bold text-white text-base">Você ({usuario.nome})</span>
+      {/* Detalhamento Expansível Lado a Lado */}
+      {detalhesAbertos && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-white/10 relative z-10 animate-fadeIn">
+          {/* Card Usuário */}
+          <div className="bg-slate-950/60 border border-blue-500/30 rounded-2xl p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-base">👤</span>
+                <span className="font-bold text-white text-sm">{nomeVoce}</span>
+              </div>
+              <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                {mesVoce || 'Sem holerite'}
+              </span>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-              <span>●</span> Mês Atualizado
-            </span>
-          </div>
-
-          <div className="space-y-2 text-xs text-slate-300 pt-2 border-t border-white/5">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Holerite Ativo:</span>
-              <span className="font-bold text-white">{mesVoce || 'Não cadastrado'}</span>
-            </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center text-xs text-slate-300">
               <span className="text-slate-400">Salário Líquido:</span>
               <span className="font-mono font-bold text-emerald-400">
                 R$ {formatarBRL(liquidoVoce)}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Status dos Contratos:</span>
-              <span className="text-slate-200 font-medium">Contratos mapeados em folha</span>
-            </div>
+            <button
+              onClick={onVerVoce}
+              className="w-full mt-2 py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <span>👁️</span> Ver Visão Individual de {primeiroNomeVoce}
+            </button>
           </div>
 
-          <button
-            onClick={onVerVoce}
-            className="w-full mt-3 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 cursor-pointer"
-          >
-            <span>👁️</span> Ver Apenas Meu Painel Individual
-          </button>
-        </div>
-
-        {/* Card Parceiro(a) (Priscila) */}
-        <div className="bg-amber-950/20 border border-amber-500/30 rounded-2xl p-5 space-y-3 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">💑</span>
-              <span className="font-bold text-white text-base">{nomeEsposa}</span>
+          {/* Card Parceira */}
+          <div className="bg-slate-950/60 border border-purple-500/30 rounded-2xl p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-base">👩</span>
+                <span className="font-bold text-white text-sm">{nomeEsposa}</span>
+              </div>
+              <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                {mesEsposa || 'Sem holerite'}
+              </span>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-              <span>▲</span> Pendente de Atualização
-            </span>
-          </div>
-
-          <div className="space-y-2 text-xs text-slate-300 pt-2 border-t border-white/5">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Último Holerite:</span>
-              <span className="font-bold text-amber-300">{mesEsposa || 'Não cadastrado'}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Salário Líquido Cadastrado:</span>
-              <span className="font-mono font-bold text-slate-300">
+            <div className="flex justify-between items-center text-xs text-slate-300">
+              <span className="text-slate-400">Salário Líquido:</span>
+              <span className="font-mono font-bold text-emerald-400">
                 R$ {formatarBRL(liquidoEsposa)}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400">Pendências de Envio:</span>
-              <span className="text-amber-400 font-bold">Holerites recentes, faturas & contratos</span>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <button
+                onClick={onVerEsposa}
+                className="py-2 px-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+              >
+                <span>🔍</span> Ver {primeiroNomeEsposa}
+              </button>
+              <button
+                onClick={onIrContracheque}
+                className="py-2 px-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+              >
+                <span>📤</span> Subir Holerite
+              </button>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            <button
-              onClick={onVerEsposa}
-              className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-            >
-              <span>🔍</span> Ver Perfil {primeiroNomeEsposa}
-            </button>
-            <button
-              onClick={onIrContracheque}
-              className="py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-amber-600/20 active:scale-95 cursor-pointer"
-            >
-              <span>📄</span> Enviar Holerite
-            </button>
-          </div>
         </div>
-
-      </div>
-
-      {/* Mensagem Explicativa de Rigor Contábil */}
-      <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 text-xs text-slate-400 flex items-start gap-3 relative z-10">
-        <span className="text-base flex-shrink-0">💡</span>
-        <p className="leading-relaxed">
-          <strong className="text-slate-200">Por que o painel conjunto fica travado?</strong> Se somássemos o seu salário de {mesVoce || 'mês atual'} com o holerite de {mesEsposa || 'mês passado'} da {primeiroNomeEsposa}, o sistema criaria um superávit ou déficit fictício que não reflete a realidade do mês. Assim que os dados pendentes forem cadastrados, o painel do casal é ativado automaticamente.
-        </p>
-      </div>
+      )}
     </div>
   );
 }

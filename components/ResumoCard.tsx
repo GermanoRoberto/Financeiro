@@ -5,6 +5,7 @@ interface ResumoCardProps {
   valor: number;
   sufixo?: string;
   cor?: 'blue' | 'green' | 'red' | 'yellow';
+  subtitulo?: string;
 }
 
 const coresEspecialistas = {
@@ -54,7 +55,7 @@ const coresEspecialistas = {
   }
 };
 
-export default function ResumoCard({ titulo, valor, sufixo = '', cor = 'blue' }: ResumoCardProps) {
+export default function ResumoCard({ titulo, valor, sufixo = '', cor = 'blue', subtitulo }: ResumoCardProps) {
   const config = coresEspecialistas[cor];
 
   return (
@@ -63,7 +64,14 @@ export default function ResumoCard({ titulo, valor, sufixo = '', cor = 'blue' }:
       <div className={`absolute top-0 right-0 w-36 h-36 bg-gradient-to-br ${config.glow} rounded-full filter blur-2xl pointer-events-none transition-all duration-300 group-hover:scale-125`} />
 
       <div className="space-y-1.5 relative z-10">
-        <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">{titulo}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">{titulo}</p>
+          {subtitulo && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10 font-medium">
+              {subtitulo}
+            </span>
+          )}
+        </div>
         <p className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${config.valColor} font-mono tabular-nums`}>
           {cor === 'blue' || cor === 'green' ? 'R$ ' : ''}
           {valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{sufixo}
