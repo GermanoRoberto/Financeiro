@@ -21,16 +21,16 @@ interface EstudoRecuperacaoProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xl text-slate-800 font-sans text-xs">
+      <div className="bg-slate-900/95 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-2xl text-white font-sans text-xs">
         <p className="font-bold text-slate-400 mb-2 uppercase tracking-wider">{label}</p>
         <div className="space-y-1.5">
           {payload.map((p: any, idx: number) => (
             <div key={idx} className="flex items-center gap-4 justify-between">
-              <span className="flex items-center gap-1.5 text-slate-600">
+              <span className="flex items-center gap-1.5 text-slate-300">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.stroke }} />
                 {p.name}:
               </span>
-              <span className="font-bold font-mono" style={{ color: p.stroke }}>
+              <span className="font-bold font-mono tabular-nums" style={{ color: p.stroke }}>
                 R$ {Number(p.value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -244,51 +244,51 @@ export default function EstudoRecuperacao({
   }
 
   return (
-    <div className="bg-white border border-slate-100 rounded-3xl p-6 space-y-6 shadow-md">
+    <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl shadow-slate-950/40 text-slate-100">
       
       {/* Cabeçalho */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
             <span>📈</span> Cenários e Projeção (Estudo de Caminho)
           </h3>
-          <p className="text-xs text-slate-500 font-medium mt-1">
+          <p className="text-xs text-slate-400 font-medium mt-1">
             Análise preditiva real cruzando receitas líquidas, dívidas externas e gastos do dia a dia.
           </p>
         </div>
 
-        {/* Seleção de Aba Interna */}
-        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 self-start gap-1">
+        {/* Seleção de Aba Interna com Nomes Explícitos */}
+        <div className="flex bg-slate-950/60 p-1 rounded-2xl border border-white/10 self-start gap-1">
           <button
             onClick={() => setAbaInterna('casal')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
               abaInterna === 'casal'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            👥 Casal
+            🏠 Casal
           </button>
           <button
             onClick={() => setAbaInterna('voce')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
               abaInterna === 'voce'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            🙋‍♂️ Você
+            👤 Germano
           </button>
           {usuarioEsposa && (
             <button
               onClick={() => setAbaInterna('esposa')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 abaInterna === 'esposa'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              🙋‍♀️ {usuarioEsposa.nome.split(' ')[0]}
+              👩 Priscila
             </button>
           )}
         </div>
@@ -296,40 +296,40 @@ export default function EstudoRecuperacao({
 
       {/* Se a aba for Casal e os dados estiverem desincronizados, bloquear a projeção conjunta */}
       {abaInterna === 'casal' && !estaSincronizado ? (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-slate-800 space-y-4">
-          <div className="flex items-center gap-3 text-amber-700 font-bold text-base">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-slate-200 space-y-4">
+          <div className="flex items-center gap-3 text-amber-400 font-bold text-base">
             <span className="text-2xl">🔒</span>
             <span>Estudo do Casal Bloqueado: Sincronização de Meses Pendente</span>
           </div>
-          <p className="text-xs text-slate-600 leading-relaxed">
+          <p className="text-xs text-slate-300 leading-relaxed">
             Para gerar um <strong>Estudo de Caminho e Recuperação Conjunto</strong> de 6 meses matematicamente confiável, ambos os parceiros precisam estar com os holerites do mesmo mês cadastrados. Atualmente, os meses de referência divergem:
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white/80 p-4 rounded-xl border border-amber-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-950/60 p-4 rounded-xl border border-white/10">
             <div>
-              <span className="font-bold text-slate-700 block">Você ({usuario.nome}):</span>
-              <span className="text-emerald-600 font-medium">Mês Ativo: {mesVoce || 'Atualizado'} ✅</span>
+              <span className="font-bold text-slate-300 block">Germano ({usuario.nome}):</span>
+              <span className="text-emerald-400 font-medium">Mês Ativo: {mesVoce || 'Atualizado'} ✅</span>
             </div>
             <div>
-              <span className="font-bold text-slate-700 block">{usuarioEsposa?.nome || 'Parceiro(a)'}:</span>
-              <span className="text-amber-600 font-medium">Mês Ativo: {mesEsposa || 'Pendente de envio'} ⚠️</span>
+              <span className="font-bold text-slate-300 block">Priscila ({usuarioEsposa?.nome || 'Parceiro(a)'}):</span>
+              <span className="text-amber-400 font-medium">Mês Ativo: {mesEsposa || 'Pendente de envio'} ⚠️</span>
             </div>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-400">
             Selecione uma das abas acima ou clique nos botões abaixo para ver o estudo real e individual de cada um:
           </p>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               onClick={() => setAbaInterna('voce')}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
             >
-              🙋‍♂️ Ver Estudo de Você ({usuario.nome})
+              👤 Ver Estudo do Germano
             </button>
             {usuarioEsposa && (
               <button
                 onClick={() => setAbaInterna('esposa')}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
               >
-                🙋‍♀️ Ver Estudo da {usuarioEsposa.nome.split(' ')[0]}
+                👩 Ver Estudo da Priscila
               </button>
             )}
           </div>
@@ -337,22 +337,22 @@ export default function EstudoRecuperacao({
       ) : (
         <>
           {/* Raio-X do Fluxo de Caixa Mensal */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-950/50 p-4 rounded-2xl border border-white/5">
             <div>
               <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Receita Líquida (Na Conta)</span>
-              <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(receita)}</span>
+              <span className="text-sm font-bold text-white font-mono tabular-nums">R$ {formatarBRL(receita)}</span>
             </div>
             <div>
               <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Dívidas Externas (Fixas)</span>
-              <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(totalDividasExternas)}</span>
+              <span className="text-sm font-bold text-white font-mono tabular-nums">R$ {formatarBRL(totalDividasExternas)}</span>
             </div>
             <div>
               <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Variáveis (Média 30d)</span>
-              <span className="text-sm font-bold text-slate-800 font-mono">R$ {formatarBRL(despesasVariaveis)}</span>
+              <span className="text-sm font-bold text-white font-mono tabular-nums">R$ {formatarBRL(despesasVariaveis)}</span>
             </div>
             <div>
               <span className="text-xxs uppercase font-bold text-slate-400 block mb-1">Saldo Livre Mensal</span>
-              <span className={`text-sm font-bold font-mono ${sobraAtual >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              <span className={`text-sm font-bold font-mono tabular-nums ${sobraAtual >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {sobraAtual >= 0 ? '+' : ''}R$ {formatarBRL(sobraAtual)}
               </span>
             </div>
@@ -362,39 +362,39 @@ export default function EstudoRecuperacao({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             {/* Cenário A */}
-            <div className="bg-blue-50/50 border border-blue-100 p-5 rounded-2xl space-y-3 shadow-sm">
+            <div className="bg-blue-500/10 border border-blue-500/20 p-5 rounded-2xl space-y-3 shadow-sm">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-blue-600 text-sm flex items-center gap-1.5">
+                <h4 className="font-bold text-blue-400 text-sm flex items-center gap-1.5">
                   <span>🛡️</span> Cenário A (Foco em Sobrevivência)
                 </h4>
-                <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold uppercase">
+                <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
                   Corte de 15%
                 </span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Reduzir despesas variáveis em <strong>15%</strong> (Economia mensal de <strong>R$ {formatarBRL(despesasVariaveis * 0.15)}</strong>).
               </p>
-              <div className="text-xs font-bold text-slate-500">
+              <div className="text-xs font-bold text-slate-400">
                 Impacto: {mesViradaA > 0 ? `Sairá do vermelho em até ${mesViradaA * 30} dias.` : 'Tendência de melhora gradual.'}
               </div>
             </div>
 
             {/* Cenário B */}
-            <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-2xl space-y-3 shadow-sm">
+            <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-2xl space-y-3 shadow-sm">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-amber-600 text-sm flex items-center gap-1.5">
+                <h4 className="font-bold text-amber-400 text-sm flex items-center gap-1.5">
                   <span>🤝</span> Cenário B (Foco em Renegociação)
                 </h4>
-                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase">
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
                   Alívio de Parcela
                 </span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 {maiorDivida > 0 
                   ? <>Renegociar ou quitar a maior parcela identificada neste perfil (alívio de <strong>R$ {formatarBRL(maiorDivida)}/mês</strong> a partir do Mês 3).</>
                   : <>Nenhuma dívida ativa para renegociar neste perfil. O foco deve ser corte de custos variáveis.</>}
               </p>
-              <div className="text-xs font-bold text-slate-500">
+              <div className="text-xs font-bold text-slate-400">
                 Impacto: {mesViradaB > 0 ? `Sairá do vermelho no ${mesViradaB}º mês.` : 'Estabilização progressiva.'}
               </div>
             </div>
@@ -402,25 +402,25 @@ export default function EstudoRecuperacao({
           </div>
 
           {/* Gráfico de Projeção */}
-          <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl">
-            <h4 className="font-bold text-slate-500 text-xs mb-4 uppercase tracking-wider">
-              Projeção do Saldo Acumulado ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Seu perfil' : `Perfil da ${usuarioEsposa?.nome.split(' ')[0]}`})
+          <div className="bg-slate-950/50 border border-white/5 p-5 rounded-2xl">
+            <h4 className="font-bold text-slate-400 text-xs mb-4 uppercase tracking-wider">
+              Projeção do Saldo Acumulado ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Germano' : 'Priscila'})
             </h4>
             <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dadosGrafico} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.06)" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
                   <XAxis dataKey="mes" stroke="#64748b" fontSize={11} />
                   <YAxis stroke="#64748b" fontSize={11} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                  <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} formatter={(v) => <span className="text-slate-300 font-semibold">{v}</span>} />
+                  <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" />
                   <Line
                     type="monotone"
                     dataKey="Cenário A (Corte)"
                     stroke="#3b82f6"
                     strokeWidth={3}
-                    dot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: '#0946b5' }}
+                    dot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: '#0f172a' }}
                     activeDot={{ r: 6 }}
                   />
                   <Line
@@ -428,7 +428,7 @@ export default function EstudoRecuperacao({
                     dataKey="Cenário B (Renegociação)"
                     stroke="#f59e0b"
                     strokeWidth={3}
-                    dot={{ r: 4, stroke: '#f59e0b', strokeWidth: 2, fill: '#120436' }}
+                    dot={{ r: 4, stroke: '#f59e0b', strokeWidth: 2, fill: '#0f172a' }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
@@ -439,35 +439,35 @@ export default function EstudoRecuperacao({
       )}
 
       {/* Rastreador de Alertas */}
-      <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl space-y-3 shadow-sm">
-        <h4 className="font-bold text-emerald-600 text-sm flex items-center gap-1.5">
-          <span>🔔</span> Alertas do Rastreador de Recuperação ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Você' : usuarioEsposa?.nome.split(' ')[0]})
+      <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-2xl space-y-3 shadow-sm">
+        <h4 className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
+          <span>🔔</span> Alertas do Rastreador de Recuperação ({abaInterna === 'casal' ? 'Casal' : abaInterna === 'voce' ? 'Germano' : 'Priscila'})
         </h4>
         <ul className="space-y-2">
           {alertas.map((alerta, idx) => (
-            <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">🌱</span>
+            <li key={idx} className="text-xs text-slate-300 flex items-start gap-2">
+              <span className="text-emerald-400 mt-0.5">🌱</span>
               <span>{alerta}</span>
             </li>
           ))}
         </ul>
       </div>
 
-      {/* Auditoria da Base de Dados & Alerta de Dívidas Incompletas */}
-      <div className="bg-amber-50/60 border border-amber-200 p-5 rounded-2xl space-y-3 shadow-sm">
-        <h4 className="font-bold text-amber-800 text-sm flex items-center gap-2">
+      {/* Auditoria da Base de Dívidas & Alerta de Dívidas Incompletas */}
+      <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-2xl space-y-3 shadow-sm">
+        <h4 className="font-bold text-amber-400 text-sm flex items-center gap-2">
           <span>🔍</span> Auditoria da Base de Dívidas & Completude de Dados
         </h4>
         
-        <p className="text-xs text-amber-900 leading-relaxed">
+        <p className="text-xs text-amber-300/90 leading-relaxed">
           <strong>Atenção Crítica:</strong> A precisão deste estudo depende 100% do envio de <strong>todas</strong> as dívidas, empréstimos e faturas de cartão de crédito. Se houver contas omitidas ou contratos pendentes de envio, qualquer cenário de recuperação torna-se irreal.
         </p>
 
-        <div className="bg-white/80 rounded-xl p-3 border border-amber-200/60 space-y-2 text-xs text-slate-700">
-          <div className="font-semibold text-slate-800">
-            Status dos contratos cadastrados para {abaInterna === 'casal' ? 'o Casal' : abaInterna === 'voce' ? usuario.nome : usuarioEsposa?.nome}:
+        <div className="bg-slate-950/60 rounded-xl p-4 border border-amber-500/20 space-y-2 text-xs text-slate-300">
+          <div className="font-semibold text-white">
+            Status dos contratos cadastrados para {abaInterna === 'casal' ? 'o Casal' : abaInterna === 'voce' ? 'Germano' : 'Priscila'}:
           </div>
-          <ul className="list-disc list-inside space-y-1 text-slate-600">
+          <ul className="list-disc list-inside space-y-1 text-slate-300">
             <li>
               <strong>Contratos de Empréstimo/Consignado:</strong> {consignadosTabela.length} contrato(s) detalhado(s) totalizando R$ {formatarBRL(totalConsignadosTabela)}/mês.
             </li>
@@ -475,19 +475,19 @@ export default function EstudoRecuperacao({
               <strong>Dívidas Externas / Cartões Ativos:</strong> {dividasExternas.length} dívida(s) totalizando R$ {formatarBRL(totalDividasExternas)}/mês.
             </li>
             {diferencaConsignadoNaoMapeada > 10 && (
-              <li className="text-rose-700 font-bold">
+              <li className="text-rose-400 font-bold">
                 ⚠️ O holerite desconta R$ {formatarBRL(totalEmprestimosFolha)} em empréstimos, mas apenas R$ {formatarBRL(totalConsignadosTabela)} estão cadastrados em contratos. Há <span className="underline">R$ {formatarBRL(diferencaConsignadoNaoMapeada)}/mês</span> de empréstimos sem contratos detalhados!
               </li>
             )}
             {dividasExternas.length === 0 && (
-              <li className="text-slate-500 italic">
+              <li className="text-slate-400 italic">
                 Nenhum parcelamento externo ou fatura de cartão de crédito cadastrado manualmente neste perfil.
               </li>
             )}
           </ul>
         </div>
 
-        <div className="text-xxs text-amber-800 font-medium italic">
+        <div className="text-xxs text-amber-400 font-medium italic">
           💡 Dica: Se faltarem contratos de empréstimo ou cartões, envie os prints ou PDFs no Telegram da Azula para recalcular o estudo com o pé no chão.
         </div>
       </div>

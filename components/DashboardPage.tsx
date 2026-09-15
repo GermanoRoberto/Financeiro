@@ -308,8 +308,14 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
         
         {/* Barra superior de controles */}
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-3xl backdrop-blur-md">
-          {/* Seletor de Visão */}
-          <SeletorVisao visao={visao} onChange={setVisao} temEsposa={!!usuarioEsposa} nomeParceiro={usuarioEsposa?.nome} />
+          {/* Seletor de Visão com Nomes Explícitos */}
+          <SeletorVisao
+            visao={visao}
+            onChange={setVisao}
+            temEsposa={!!usuarioEsposa}
+            nomeUsuario={usuario.nome}
+            nomeParceiro={usuarioEsposa?.nome}
+          />
 
           {/* Abas de Navegação */}
           <div className="flex bg-slate-950/40 p-1.5 rounded-2xl border border-white/5 max-w-full overflow-x-auto self-start md:self-auto">

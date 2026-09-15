@@ -63,9 +63,11 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       
       {/* Gráfico de Barras - Projeção Mensal */}
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
+      <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-slate-950/40 border border-white/10 p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-bold text-slate-800">📊 Projeção Financeira (6 Meses)</h3>
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <span>📊</span> Projeção Financeira (6 Meses)
+          </h3>
           <p className="text-xs text-slate-400 font-medium mt-0.5">Visão comparativa entre receitas, despesas e saldo líquido</p>
         </div>
         <ResponsiveContainer width="100%" height={300}>
@@ -84,14 +86,14 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                 <stop offset="95%" stopColor="#047857" stopOpacity={0.95}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="mes" stroke="#94a3b8" fontSize={11} fontWeight={500} />
-            <YAxis stroke="#94a3b8" fontSize={11} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+            <XAxis dataKey="mes" stroke="#64748b" fontSize={11} fontWeight={600} />
+            <YAxis stroke="#64748b" fontSize={11} />
             <Tooltip content={<CustomTooltip />} />
             <Legend 
               iconType="circle" 
               wrapperStyle={{ fontSize: 12, paddingTop: 10 }} 
-              formatter={(value) => <span className="text-slate-700 font-bold">{value}</span>}
+              formatter={(value) => <span className="text-slate-300 font-semibold">{value}</span>}
             />
             <Bar dataKey="receita" fill="url(#barBlue)" name="Receita (Bruta)" radius={[4, 4, 0, 0]} barSize={14} />
             <Bar dataKey="despesas" fill="url(#barRed)" name="Despesas Totais" radius={[4, 4, 0, 0]} barSize={14} />
@@ -102,9 +104,11 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
 
       {/* Gráfico de Pizza (Donut) - Tipos de Desconto */}
       {tipoDespesasData.length > 0 ? (
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6">
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-slate-950/40 border border-white/10 p-6">
           <div className="mb-4">
-            <h3 className="text-lg font-bold text-slate-800">🥧 Composição de Descontos</h3>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🥧</span> Composição de Descontos
+            </h3>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Distribuição das despesas por tipo no contracheque atual</p>
           </div>
           <ResponsiveContainer width="100%" height={380}>
@@ -120,7 +124,7 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                 dataKey="value"
               >
                 {tipoDespesasData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={2} />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="#0f172a" strokeWidth={2} />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
@@ -135,22 +139,24 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                   const total = tipoDespesasData.reduce((acc, d) => acc + d.value, 0);
                   const percent = total > 0 ? ((item?.value || 0) / total * 100).toFixed(0) : 0;
                   const nomeCurto = value.length > 28 ? value.substring(0, 26) + '...' : value;
-                  return <span className="text-slate-700 font-bold">{nomeCurto} ({percent}%)</span>;
+                  return <span className="text-slate-300 font-semibold">{nomeCurto} ({percent}%)</span>;
                 }}
               />
             </PieChart>
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 flex flex-col justify-center items-center h-[382px] text-slate-400">
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-slate-950/40 border border-white/10 p-6 flex flex-col justify-center items-center h-[382px] text-slate-400">
           <span>📋 Sem descontos registrados para detalhamento</span>
         </div>
       )}
 
       {/* Gráfico de Área (Tendência) - Tendência de Despesas */}
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 lg:col-span-2">
+      <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl shadow-slate-950/40 border border-white/10 p-6 lg:col-span-2">
         <div className="mb-4">
-          <h3 className="text-lg font-bold text-slate-800">📈 Tendência e Evolução de Custos</h3>
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <span>📈</span> Tendência e Evolução de Custos
+          </h3>
           <p className="text-xs text-slate-400 font-medium mt-0.5">Prospecção de custos consolidados para os próximos 12 meses</p>
         </div>
         <ResponsiveContainer width="100%" height={300}>
@@ -164,12 +170,12 @@ export default function GraficosFinanceiros({ projecao }: GraficosFinanceirosPro
                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="mes" stroke="#94a3b8" fontSize={11} fontWeight={500} />
-            <YAxis stroke="#94a3b8" fontSize={11} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+            <XAxis dataKey="mes" stroke="#64748b" fontSize={11} fontWeight={600} />
+            <YAxis stroke="#64748b" fontSize={11} />
             <Tooltip content={<CustomTooltip />} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-            <Area type="monotone" dataKey="total" stroke="#3b82f6" name="Total Acumulado" strokeWidth={3} fillOpacity={1} fill="url(#areaGradient)" activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#fff' }} />
+            <Area type="monotone" dataKey="total" stroke="#3b82f6" name="Total Acumulado" strokeWidth={3} fillOpacity={1} fill="url(#areaGradient)" activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#0f172a' }} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
