@@ -16,48 +16,94 @@ export default function AcertoContasCasal({
   usuario,
   usuarioEsposa,
 }: AcertoContasCasalProps) {
-  const [periodoFiltro, setPeriodoFiltro] = useState<'mes_atual' | 'todos'>('mes_atual');
-  const [copiado, setCopiado] = useState(false);
-
   const nomeVoce = usuario.nome || 'Você';
   const primeiroNomeVoce = nomeVoce.split(' ')[0];
   const nomeEsposa = usuarioEsposa?.nome || 'Parceiro(a)';
   const primeiroNomeEsposa = nomeEsposa.split(' ')[0];
 
-  // Identificar mês atual em UTC/ISO (AAAA-MM)
-  const mesAtualStr = useMemo(() => {
-    const hoje = new Date();
-    return hoje.toISOString().substring(0, 7);
-  }, []);
+  // Identificar todos os meses disponíveis nos gastos
+  const mesesDisponiveis = useMemo(() => {
+    const setMeses = new Set<string>();
+    gastos.forEach((g) => {
+      if (g.data && g.data.length >= 7) {
+        setMeses.add(g.data.substring(0, 7));
+      }
+    });
+    return Array.from(setMeses).sort().reverse();
+  }, [gastos]);
+
+  // Identificar o mês mais recente onde AMBOS têm despesas registradas (paridade contábil)
+  const mesParidadePadrao = useMemo(() => {
+    for (const mes of mesesDisponiveis) {
+      const temVoce = gastos.some(
+        (g) =>
+          (g.data || '').startsWith(mes) &&
+          g.usuario_id === usuario.id &&
+          g.categoria !== 'receita_extra' &&
+          g.categoria !== 'transferencia'
+      );
+      const temEsposa = usuarioEsposa
+        ? gastos.some(
+            (g) =>
+              (g.data || '').startsWith(mes) &&
+              g.usuario_id === usuarioEsposa.id &&
+              g.categoria !== 'receita_extra' &&
+              g.categoria !== 'transferencia'
+          )
+        : false;
+
+      if (temVoce && temEsposa) {
+        return mes;
+      }
+    }
+    return mesesDisponiveis[0] || 'todos';
+  }, [mesesDisponiveis, gastos, usuario.id, usuarioEsposa]);
+
+  const [periodoFiltro, setPeriodoFiltro] = useState<string>(mesParidadePadrao || 'todos');
+  const [copiado, setCopiado] = useState(false);
+
+  // Formatar nome do mês selecionado
+  const formatarMesLabel = (mesIso: string) => {
+    if (mesIso === 'todos') return 'Histórico Total';
+    try {
+      const [ano, mes] = mesIso.split('-');
+      const d = new Date(Number(ano), Number(mes) - 1, 1);
+      const nome = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return nome.charAt(0).toUpperCase() + nome.slice(1);
+    } catch {
+      return mesIso;
+    }
+  };
 
   // Filtrar despesas elegíveis para o rateio do casal
   const despesasCasal = useMemo(() => {
     return gastos.filter((g) => {
-      // Apenas despesas (desconsidera transferências entre contas e receitas extras)
+      // Desconsidera transferências entre contas e receitas
       const cat = (g.categoria || '').toLowerCase();
       if (cat === 'receita_extra' || cat === 'transferencia') return false;
 
-      // Filtrar por período se selecionado mês atual
-      if (periodoFiltro === 'mes_atual') {
+      // Filtrar por período se selecionado mês específico
+      if (periodoFiltro !== 'todos') {
         const dataGasto = (g.data || '').substring(0, 7);
-        if (dataGasto !== mesAtualStr) return false;
+        if (dataGasto !== periodoFiltro) return false;
       }
 
       return true;
     });
-  }, [gastos, periodoFiltro, mesAtualStr]);
+  }, [gastos, periodoFiltro]);
 
-  // Total pago por cada um
-  const totalVoce = useMemo(() => {
-    const gastosVoce = despesasCasal.filter((g) => g.usuario_id === usuario.id);
-    return somarValores(gastosVoce.map((g) => g.valor || 0));
-  }, [despesasCasal, usuario.id]);
+  // Total pago e quantidade de lançamentos por cada um
+  const gastosVoce = useMemo(
+    () => despesasCasal.filter((g) => g.usuario_id === usuario.id),
+    [despesasCasal, usuario.id]
+  );
+  const gastosEsposa = useMemo(
+    () => (usuarioEsposa ? despesasCasal.filter((g) => g.usuario_id === usuarioEsposa.id) : []),
+    [despesasCasal, usuarioEsposa]
+  );
 
-  const totalEsposa = useMemo(() => {
-    if (!usuarioEsposa) return 0;
-    const gastosEsposa = despesasCasal.filter((g) => g.usuario_id === usuarioEsposa.id);
-    return somarValores(gastosEsposa.map((g) => g.valor || 0));
-  }, [despesasCasal, usuarioEsposa]);
+  const totalVoce = useMemo(() => somarValores(gastosVoce.map((g) => g.valor || 0)), [gastosVoce]);
+  const totalEsposa = useMemo(() => somarValores(gastosEsposa.map((g) => g.valor || 0)), [gastosEsposa]);
 
   const totalGeral = totalVoce + totalEsposa;
   const cotaPorPessoa = totalGeral / 2;
@@ -71,15 +117,23 @@ export default function AcertoContasCasal({
   const quemRecebe = diferenca > 0 ? primeiroNomeVoce : primeiroNomeEsposa;
   const estaEquilibrado = Math.round(valorAcerto * 100) === 0;
 
+  // Verificação de assimetria de extratos (um parceiro com 0 lançamentos enquanto o outro tem vários)
+  const temAssimetriaExtrato =
+    (gastosVoce.length === 0 && gastosEsposa.length > 0) ||
+    (gastosEsposa.length === 0 && gastosVoce.length > 0);
+
+  const parceiroSemExtrato = gastosVoce.length === 0 ? primeiroNomeVoce : primeiroNomeEsposa;
+  const parceiroComExtrato = gastosVoce.length === 0 ? primeiroNomeEsposa : primeiroNomeVoce;
+  const countComExtrato = gastosVoce.length === 0 ? gastosEsposa.length : gastosVoce.length;
+
   // Porcentagens de desembolso
   const pctVoce = totalGeral > 0 ? Math.round((totalVoce / totalGeral) * 100) : 50;
   const pctEsposa = totalGeral > 0 ? 100 - pctVoce : 50;
 
   const copiarResumoWhatsApp = () => {
-    const dataAtual = new Date();
-    const nomeMes = dataAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    
-    let texto = `🧾 *Fechamento Financeiro do Casal - ${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)}*\n\n`;
+    const nomeMes = formatarMesLabel(periodoFiltro);
+
+    let texto = `🧾 *Fechamento Financeiro do Casal - ${nomeMes}*\n\n`;
     texto += `💸 *Total Compartilhado:* R$ ${formatarBRL(totalGeral)}\n`;
     texto += `• ${primeiroNomeVoce} desembolsou: R$ ${formatarBRL(totalVoce)} (${pctVoce}%)\n`;
     texto += `• ${primeiroNomeEsposa} desembolsou: R$ ${formatarBRL(totalEsposa)} (${pctEsposa}%)\n`;
@@ -122,39 +176,37 @@ export default function AcertoContasCasal({
           </div>
         </div>
 
-        {/* Seletor de Período e Botão WhatsApp */}
+        {/* Seletor Dinâmico de Mês e Botão WhatsApp */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="bg-slate-950/70 p-1 rounded-xl border border-white/5 flex items-center">
-            <button
-              onClick={() => setPeriodoFiltro('mes_atual')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                periodoFiltro === 'mes_atual'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+          <div className="flex items-center gap-1.5 bg-slate-950/80 border border-white/10 rounded-xl px-2.5 py-1.5">
+            <span className="text-xs text-slate-400 font-medium">Mês:</span>
+            <select
+              value={periodoFiltro}
+              onChange={(e) => setPeriodoFiltro(e.target.value)}
+              aria-label="Selecionar Mês de Referência"
+              className="bg-transparent text-xs font-bold text-indigo-300 focus:outline-none cursor-pointer"
             >
-              Mês Atual
-            </button>
-            <button
-              onClick={() => setPeriodoFiltro('todos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                periodoFiltro === 'todos'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Histórico
-            </button>
+              {mesesDisponiveis.map((mes) => (
+                <option key={mes} value={mes} className="bg-slate-900 text-white">
+                  {formatarMesLabel(mes)}
+                </option>
+              ))}
+              <option value="todos" className="bg-slate-900 text-white">
+                Histórico Geral (Todos)
+              </option>
+            </select>
           </div>
 
-          <button
-            onClick={copiarResumoWhatsApp}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/5"
-            title="Copiar resumo para enviar no WhatsApp"
-          >
-            <span>{copiado ? '✓' : '📋'}</span>
-            <span>{copiado ? 'Copiado!' : 'Copiar p/ WhatsApp'}</span>
-          </button>
+          {!temAssimetriaExtrato && (
+            <button
+              onClick={copiarResumoWhatsApp}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/5"
+              title="Copiar resumo para enviar no WhatsApp"
+            >
+              <span>{copiado ? '✓' : '📋'}</span>
+              <span>{copiado ? 'Copiado!' : 'Copiar p/ WhatsApp'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -169,11 +221,11 @@ export default function AcertoContasCasal({
             </span>
             <span className="font-mono text-blue-400 font-bold">{pctVoce}%</span>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-tight">
+          <div className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-tight font-mono">
             R$ {formatarBRL(totalVoce)}
           </div>
-          <p className="text-[11px] text-slate-500">
-            {despesasCasal.filter((g) => g.usuario_id === usuario.id).length} lançamentos
+          <p className="text-xs text-slate-400">
+            {gastosVoce.length} lançamentos {gastosVoce.length === 0 ? '(Sem extrato no mês)' : ''}
           </p>
         </div>
 
@@ -186,11 +238,11 @@ export default function AcertoContasCasal({
             </span>
             <span className="font-mono text-purple-400 font-bold">{pctEsposa}%</span>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-tight">
+          <div className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-tight font-mono">
             R$ {formatarBRL(totalEsposa)}
           </div>
-          <p className="text-[11px] text-slate-500">
-            {despesasCasal.filter((g) => g.usuario_id === usuarioEsposa?.id).length} lançamentos
+          <p className="text-xs text-slate-400">
+            {gastosEsposa.length} lançamentos {gastosEsposa.length === 0 ? '(Sem extrato no mês)' : ''}
           </p>
         </div>
 
@@ -198,12 +250,12 @@ export default function AcertoContasCasal({
         <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Total Compartilhado</span>
-            <span className="text-[10px] text-slate-500 font-mono">Meta: 50% cada</span>
+            <span className="text-xs text-slate-400 font-mono">Meta: 50% cada</span>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-slate-200 tabular-nums tracking-tight">
+          <div className="text-xl sm:text-2xl font-black text-slate-200 tabular-nums tracking-tight font-mono">
             R$ {formatarBRL(totalGeral)}
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-xs text-slate-400">
             Cota justa: <span className="text-white font-mono font-semibold">R$ {formatarBRL(cotaPorPessoa)}</span>
           </p>
         </div>
@@ -223,7 +275,7 @@ export default function AcertoContasCasal({
             title={`${primeiroNomeEsposa}: ${pctEsposa}%`}
           />
         </div>
-        <div className="flex justify-between text-[11px] font-medium text-slate-400 px-1">
+        <div className="flex justify-between text-xs font-medium text-slate-400 px-1">
           <span className="text-blue-400 flex items-center gap-1">
             ▲ {primeiroNomeVoce} ({pctVoce}%)
           </span>
@@ -233,60 +285,78 @@ export default function AcertoContasCasal({
         </div>
       </div>
 
-      {/* Banner Conclusivo do Acerto (Call to Action) */}
-      <div
-        className={`rounded-2xl p-4 sm:p-5 border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10 transition-all ${
-          estaEquilibrado
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-            : 'bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border-indigo-500/30 text-white'
-        }`}
-      >
-        <div className="flex items-center gap-3.5">
-          <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
-              estaEquilibrado
-                ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
-                : 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300'
-            }`}
-          >
-            {estaEquilibrado ? '🎉' : '💸'}
-          </div>
-          <div>
-            {estaEquilibrado ? (
-              <>
-                <h4 className="font-bold text-sm text-emerald-200">
-                  Despesas em Equilíbrio Perfeito!
-                </h4>
-                <p className="text-xs text-emerald-400/80 mt-0.5">
-                  Ambos contribuíram igualmente para os gastos deste período. Nenhum acerto pendente.
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
-                  Ajuste Sugerido para Fechar 50/50
-                </div>
-                <h4 className="font-bold text-base text-white mt-0.5">
-                  <span className="text-indigo-400 font-extrabold">{quemPaga}</span> deve transferir{' '}
-                  <span className="text-emerald-400 font-mono font-black text-lg">
-                    R$ {formatarBRL(valorAcerto)}
-                  </span>{' '}
-                  para <span className="text-purple-400 font-extrabold">{quemRecebe}</span>
-                </h4>
-              </>
-            )}
+      {/* Banner Conclusivo do Acerto (Call to Action ou Alerta de Assimetria) */}
+      {temAssimetriaExtrato ? (
+        <div className="rounded-2xl p-4 sm:p-5 border bg-amber-500/10 border-amber-500/30 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 bg-amber-500/20 border border-amber-500/40 text-amber-300">
+              ⏳
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-amber-200">
+                Aguardando Extratos de {parceiroSemExtrato} ({formatarMesLabel(periodoFiltro)})
+              </h4>
+              <p className="text-xs text-amber-300/80 mt-0.5 max-w-2xl leading-relaxed">
+                {parceiroComExtrato} possui {countComExtrato} despesas cadastradas neste mês, mas {parceiroSemExtrato} ainda não importou seus extratos bancários/faturas. O cálculo de fechamento só é gerado após ambos cadastrarem seus gastos, evitando ordens de transferência injustas.
+              </p>
+            </div>
           </div>
         </div>
+      ) : (
+        <div
+          className={`rounded-2xl p-4 sm:p-5 border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10 transition-all ${
+            estaEquilibrado
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+              : 'bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border-indigo-500/30 text-white'
+          }`}
+        >
+          <div className="flex items-center gap-3.5">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
+                estaEquilibrado
+                  ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300'
+              }`}
+            >
+              {estaEquilibrado ? '🎉' : '💸'}
+            </div>
+            <div>
+              {estaEquilibrado ? (
+                <>
+                  <h4 className="font-bold text-sm text-emerald-200">
+                    Despesas em Equilíbrio Perfeito!
+                  </h4>
+                  <p className="text-xs text-emerald-400/80 mt-0.5">
+                    Ambos contribuíram igualmente para os gastos deste período. Nenhum acerto pendente.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                    Ajuste Sugerido para Fechar 50/50 ({formatarMesLabel(periodoFiltro)})
+                  </div>
+                  <h4 className="font-bold text-base text-white mt-0.5">
+                    <span className="text-indigo-400 font-extrabold">{quemPaga}</span> deve transferir{' '}
+                    <span className="text-emerald-400 font-mono font-black text-lg">
+                      R$ {formatarBRL(valorAcerto)}
+                    </span>{' '}
+                    para <span className="text-purple-400 font-extrabold">{quemRecebe}</span>
+                  </h4>
+                </>
+              )}
+            </div>
+          </div>
 
-        {!estaEquilibrado && (
-          <button
-            onClick={copiarResumoWhatsApp}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer whitespace-nowrap"
-          >
-            Enviar Acerto
-          </button>
-        )}
-      </div>
+          {!estaEquilibrado && (
+            <button
+              onClick={copiarResumoWhatsApp}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              Enviar Acerto
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
