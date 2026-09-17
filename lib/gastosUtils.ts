@@ -86,6 +86,55 @@ export function isGastoCompartilhado(g: GastoDiario): boolean {
     return true;
   }
 
-  // Demais compras/outros são tratados como pessoais por padrão para não onerar o cônjuge
+  // Estabelecimentos essenciais de sustento da família reconhecidos mesmo se categoria estiver 'outros'
+  if (
+    desc.includes('bahamas') ||
+    desc.includes('supermercado') ||
+    desc.includes('mercado') ||
+    desc.includes('carrefour') ||
+    desc.includes('padaria') ||
+    desc.includes('lisboa') ||
+    desc.includes('drogaria') ||
+    desc.includes('farmacia') ||
+    desc.includes('araujo') ||
+    desc.includes('ifood') ||
+    desc.includes('churrasco') ||
+    desc.includes('posto') ||
+    desc.includes('combustivel') ||
+    desc.includes('cemig') ||
+    desc.includes('copasa') ||
+    desc.includes('claro') ||
+    desc.includes('vivo')
+  ) {
+    return true;
+  }
+
+  // Demais compras avulsas não identificadas são tratadas como pessoais
   return false;
 }
+
+/**
+ * Retorna se um desconto em folha representa desembolso compartilhado
+ * (ex: consignados, empréstimos, coparticipação de saúde familiar),
+ * excluindo retenções tributárias e previdenciárias governamentais (INSS, IRRF, FPM).
+ */
+export function isDescontoCompartilhavel(tipo?: string, descricao?: string): boolean {
+  const texto = `${tipo || ''} ${descricao || ''}`.toLowerCase();
+
+  if (
+    texto.includes('inss') ||
+    texto.includes('irrf') ||
+    texto.includes('imposto') ||
+    texto.includes('previd') ||
+    texto.includes('rpps') ||
+    texto.includes('fpm') ||
+    texto.includes('sindic') ||
+    texto.includes('contribuicao negocial') ||
+    texto.includes('desc arred')
+  ) {
+    return false;
+  }
+
+  return true;
+}
+

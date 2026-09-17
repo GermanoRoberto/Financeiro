@@ -21,15 +21,6 @@ interface ItemContaFixa {
 
 const CONTAS_FIXAS_PADRAO: ItemContaFixa[] = [
   {
-    id: 'habitacao_caixa',
-    nome: 'Financiamento Habitacional Caixa',
-    categoria: 'Moradia',
-    icone: '🏠',
-    valorEstimado: 1080.22,
-    diaVencimento: 1,
-    termosIdentificacao: ['debito prestacao hab', 'prestacao hab', 'habitacao', 'cef hab'],
-  },
-  {
     id: 'energia_cemig',
     nome: 'Energia Elétrica (CEMIG)',
     categoria: 'Utilidades',

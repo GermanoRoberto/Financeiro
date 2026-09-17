@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { GastoDiario, Usuario, Contracheque, Desconto } from '@/lib/types';
 import { formatarBRL, somarValores } from '@/lib/money';
-import { isGastoCompartilhado } from '@/lib/gastosUtils';
+import { isGastoCompartilhado, isDescontoCompartilhavel } from '@/lib/gastosUtils';
 import toast from 'react-hot-toast';
 
 interface AcertoContasCasalProps {
@@ -111,6 +111,9 @@ export default function AcertoContasCasal({
       const ccMes = (cc.mes_referencia || '').substring(0, 7);
       if (periodoFiltro !== 'todos' && ccMes !== periodoFiltro) return;
 
+      // Excluir encargos tributários e previdenciários legais (INSS, IRRF, FPM)
+      if (!isDescontoCompartilhavel(d.tipo)) return;
+
       const userId = cc.usuario_id;
       if (userId === usuario.id) {
         folhaVoce.push(d);
@@ -160,57 +163,32 @@ export default function AcertoContasCasal({
     };
   }, [gastos, periodoFiltro, usuario.id, usuarioEsposa]);
 
-  // 3. DESEMBOLSO COMPARTILHADO (O que entra no rateio 50/50: Folha + Despesas da Casa)
+  // 3. DESEMBOLSOS REGISTRADOS
   const totalVoce = totalFolhaVoce + totalCompartilhadoVoce;
   const totalEsposa = totalFolhaEsposa + totalCompartilhadoEsposa;
   const totalGeral = totalVoce + totalEsposa;
-  const cotaPorPessoa = totalGeral / 2;
-
-  // Cálculo da compensação
-  const diferenca = totalVoce - totalEsposa;
-  const valorAcerto = Math.abs(diferenca) / 2;
-
-  const estaEquilibrado = Math.round(valorAcerto * 100) === 0;
-
-  // Porcentagens
-  const pctVoce = totalGeral > 0 ? Math.round((totalVoce / totalGeral) * 100) : 50;
-  const pctEsposa = totalGeral > 0 ? 100 - pctVoce : 50;
-
-  // Verificação de assimetria de dados no período
-  const temAssimetriaExtrato =
-    (totalVoce === 0 && totalEsposa > 0) || (totalEsposa === 0 && totalVoce > 0);
-
-  const parceiroSemDados = totalVoce === 0 ? primeiroNomeVoce : primeiroNomeEsposa;
-  const parceiroComDados = totalVoce === 0 ? primeiroNomeEsposa : primeiroNomeVoce;
 
   const copiarResumoWhatsApp = () => {
     const nomeMes = formatarMesLabel(periodoFiltro);
 
-    let texto = `🧾 *Fechamento Financeiro Integrado do Casal - ${nomeMes}*\n\n`;
-    texto += `💸 *Total Compartilhado da Casa:* R$ ${formatarBRL(totalGeral)}\n\n`;
-    texto += `• *${primeiroNomeVoce}* bancou para a casa: R$ ${formatarBRL(totalVoce)} (${pctVoce}%)\n`;
-    texto += `  - Retido em folha (consignados/saúde): R$ ${formatarBRL(totalFolhaVoce)}\n`;
-    texto += `  - Despesas da casa (cartões/contas): R$ ${formatarBRL(totalCompartilhadoVoce)}\n`;
+    let texto = `🧾 *Consolidação Financeira do Casal - ${nomeMes}*\n\n`;
+    texto += `• *${primeiroNomeVoce}* (Lançamentos Registrados): R$ ${formatarBRL(totalVoce)}\n`;
+    texto += `  - Retido em folha (empréstimos/saúde): R$ ${formatarBRL(totalFolhaVoce)}\n`;
+    texto += `  - Despesas da casa identificadas: R$ ${formatarBRL(totalCompartilhadoVoce)}\n`;
     if (totalPessoalVoce > 0) {
-      texto += `  - (Compras pessoais individuais: R$ ${formatarBRL(totalPessoalVoce)})\n`;
+      texto += `  - Compras particulares individuais: R$ ${formatarBRL(totalPessoalVoce)}\n`;
     }
-    texto += `\n• *${primeiroNomeEsposa}* bancou para a casa: R$ ${formatarBRL(totalEsposa)} (${pctEsposa}%)\n`;
-    texto += `  - Retido em folha (consignados/saúde): R$ ${formatarBRL(totalFolhaEsposa)}\n`;
-    texto += `  - Despesas da casa (cartões/contas): R$ ${formatarBRL(totalCompartilhadoEsposa)}\n`;
+    texto += `\n• *${primeiroNomeEsposa}* (Lançamentos Registrados): R$ ${formatarBRL(totalEsposa)}\n`;
+    texto += `  - Retido em folha (empréstimo CEF): R$ ${formatarBRL(totalFolhaEsposa)}\n`;
+    texto += `  - Despesas da casa identificadas: R$ ${formatarBRL(totalCompartilhadoEsposa)}\n`;
     if (totalPessoalEsposa > 0) {
-      texto += `  - (Compras pessoais individuais: R$ ${formatarBRL(totalPessoalEsposa)})\n`;
+      texto += `  - Compras particulares individuais: R$ ${formatarBRL(totalPessoalEsposa)}\n`;
     }
-    texto += `\n⚖️ *Cota de referência 50/50 da casa:* R$ ${formatarBRL(cotaPorPessoa)} para cada\n\n`;
-
-    if (estaEquilibrado) {
-      texto += `✨ *Contas da casa em equilíbrio!* 🎉`;
-    } else {
-      texto += `📊 *Balanço das Despesas Conjuntas:* Diferença de R$ ${formatarBRL(valorAcerto)} na partilha (${pctVoce}% ${primeiroNomeVoce} / ${pctEsposa}% ${primeiroNomeEsposa}).`;
-    }
+    texto += `\n⚠️ *Nota de Integridade:* O financiamento do apartamento (pago por ${primeiroNomeEsposa}) ainda não foi cadastrado no sistema. Por haver assimetria de dados, divisões de 50/50 estão desabilitadas para não gerar cálculos distorcidos.`;
 
     navigator.clipboard.writeText(texto);
     setCopiado(true);
-    toast.success('Relatório analítico copiado com sucesso!');
+    toast.success('Extrato consolidado copiado com sucesso!');
     setTimeout(() => setCopiado(false), 3000);
   };
 
@@ -224,22 +202,22 @@ export default function AcertoContasCasal({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5 relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center text-xl shadow-inner">
-            ⚖️
+            📋
           </div>
           <div>
             <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              Acerto Financeiro Integrado do Casal
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Folha + Despesas da Casa (50/50)
+              Consolidação Financeira do Casal
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                Lançamentos Registrados
               </span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Consolida retenções em folha e despesas essenciais compartilhadas (exclui compras pessoais exclusivas)
+              Demonstrativo dos valores, contas e empréstimos efetivamente lançados no sistema
             </p>
           </div>
         </div>
 
-        {/* Seletor Dinâmico de Mês e Botão WhatsApp */}
+        {/* Seletor Dinâmico de Mês */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 bg-slate-950/80 border border-white/10 rounded-xl px-2.5 py-1.5">
             <span className="text-xs text-slate-400 font-medium">Mês:</span>
@@ -259,21 +237,10 @@ export default function AcertoContasCasal({
               </option>
             </select>
           </div>
-
-          {!temAssimetriaExtrato && (
-            <button
-              onClick={copiarResumoWhatsApp}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/5"
-              title="Copiar resumo completo para WhatsApp"
-            >
-              <span>{copiado ? '✓' : '📋'}</span>
-              <span>{copiado ? 'Copiado!' : 'Copiar p/ WhatsApp'}</span>
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Grid de Desembolso Individual Detalhado */}
+      {/* Grid de Desembolso Individual Registrado */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10">
         {/* Card Você */}
         <div className="bg-slate-950/50 border border-blue-500/20 rounded-2xl p-4 space-y-2">
@@ -282,14 +249,14 @@ export default function AcertoContasCasal({
               <span className="w-2 h-2 rounded-full bg-blue-400"></span>
               {primeiroNomeVoce}
             </span>
-            <span className="font-mono text-blue-400 font-bold">{pctVoce}%</span>
+            <span className="text-[11px] font-medium text-slate-400">Lançamentos Registrados</span>
           </div>
 
           <div className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-tight font-mono">
             R$ {formatarBRL(totalVoce)}
           </div>
 
-          {/* Subtotais Transparentes: Folha vs Casa vs Pessoal */}
+          {/* Subtotais Transparentes */}
           <div className="pt-2 border-t border-white/5 space-y-1 text-xs">
             <div className="flex justify-between items-center text-slate-300">
               <span className="text-slate-400">📄 Retido em Folha:</span>
@@ -321,14 +288,14 @@ export default function AcertoContasCasal({
               <span className="w-2 h-2 rounded-full bg-purple-400"></span>
               {primeiroNomeEsposa}
             </span>
-            <span className="font-mono text-purple-400 font-bold">{pctEsposa}%</span>
+            <span className="text-[11px] font-medium text-slate-400">Lançamentos Registrados</span>
           </div>
 
           <div className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-tight font-mono">
             R$ {formatarBRL(totalEsposa)}
           </div>
 
-          {/* Subtotais Transparentes: Folha vs Casa vs Pessoal */}
+          {/* Subtotais Transparentes */}
           <div className="pt-2 border-t border-white/5 space-y-1 text-xs">
             <div className="flex justify-between items-center text-slate-300">
               <span className="text-slate-400">📄 Retida em Folha:</span>
@@ -353,11 +320,11 @@ export default function AcertoContasCasal({
           </div>
         </div>
 
-        {/* Card Total e Cota 50/50 */}
+        {/* Card Total Lançado no Período */}
         <div className="bg-slate-950/50 border border-white/10 rounded-2xl p-4 space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-bold text-white">Total Conjunto</span>
-            <span className="text-xs text-slate-400 font-mono">50% para cada</span>
+            <span className="font-bold text-white">Total Lançado no Mês</span>
+            <span className="text-xs text-slate-400 font-mono">{formatarMesLabel(periodoFiltro)}</span>
           </div>
 
           <div className="text-xl sm:text-2xl font-black text-slate-200 tabular-nums tracking-tight font-mono">
@@ -366,115 +333,44 @@ export default function AcertoContasCasal({
 
           <div className="pt-2 border-t border-white/5 space-y-1 text-xs">
             <div className="flex justify-between items-center text-slate-300">
-              <span className="text-slate-400">⚖️ Cota Justa (50%):</span>
-              <span className="font-mono font-bold text-white">
-                R$ {formatarBRL(cotaPorPessoa)}
+              <span className="text-slate-400">👨 {primeiroNomeVoce}:</span>
+              <span className="font-mono font-semibold text-blue-300">
+                R$ {formatarBRL(totalVoce)}
               </span>
             </div>
-            <div className="flex justify-between items-center text-slate-400 text-[11px]">
-              <span>Base consolidada do período</span>
-              <span className="text-slate-300 font-medium">{formatarMesLabel(periodoFiltro)}</span>
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="text-slate-400">👩 {primeiroNomeEsposa}:</span>
+              <span className="font-mono font-semibold text-purple-300">
+                R$ {formatarBRL(totalEsposa)}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Barra de Proporção Visual */}
-      <div className="space-y-2 relative z-10">
-        <div className="h-3 w-full bg-slate-950 rounded-full overflow-hidden flex border border-white/5 p-0.5">
-          <div
-            style={{ width: `${pctVoce}%` }}
-            className="bg-gradient-to-r from-blue-600 to-blue-400 h-full rounded-l-full transition-all duration-500"
-            title={`${primeiroNomeVoce}: ${pctVoce}%`}
-          />
-          <div
-            style={{ width: `${pctEsposa}%` }}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-r-full transition-all duration-500"
-            title={`${primeiroNomeEsposa}: ${pctEsposa}%`}
-          />
-        </div>
-        <div className="flex justify-between text-xs font-medium text-slate-400 px-1">
-          <span className="text-blue-400 flex items-center gap-1 font-semibold">
-            ▲ {primeiroNomeVoce} ({pctVoce}%)
-          </span>
-          <span className="text-purple-400 flex items-center gap-1 font-semibold">
-            {primeiroNomeEsposa} ({pctEsposa}%) ▲
-          </span>
-        </div>
-      </div>
-
-      {/* Banner de Conclusão / Compensação Justa */}
-      {temAssimetriaExtrato ? (
-        <div className="rounded-2xl p-4 sm:p-5 border bg-amber-500/10 border-amber-500/30 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 bg-amber-500/20 border border-amber-500/40 text-amber-300">
-              ⏳
-            </div>
-            <div>
-              <h4 className="font-bold text-sm text-amber-200">
-                Aguardando Lançamentos de {parceiroSemDados} ({formatarMesLabel(periodoFiltro)})
-              </h4>
-              <p className="text-xs text-amber-300/80 mt-0.5 max-w-2xl leading-relaxed">
-                {parceiroComDados} possui desembolsos computados neste período, mas {parceiroSemDados} ainda não possui holerite ou extratos cadastrados. O acerto final só é emitido quando ambos tiverem seus dados importados.
-              </p>
-            </div>
+      {/* Banner de Integridade e Esclarecimento de Assimetria */}
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 sm:p-5 text-amber-200 relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 bg-amber-500/20 border border-amber-500/40 text-amber-300 mt-0.5 sm:mt-0">
+            ⚠️
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-bold text-sm text-amber-200">
+              Financiamento do Apartamento Pendente de Cadastro por {primeiroNomeEsposa}
+            </h4>
+            <p className="text-xs text-amber-300/90 leading-relaxed max-w-3xl">
+              O financiamento do apartamento é arcado por <strong>{primeiroNomeEsposa}</strong> (titular do contrato), porém <strong>ainda não foi lançado por ela nesta plataforma</strong>. Como <strong>{primeiroNomeVoce}</strong> já possui todos os seus gastos do dia a dia e empréstimos detalhados no sistema, qualquer cálculo de rateio ou divisão 50/50 seria fictício e distorcido. O painel mantém apenas a prestação de contas dos lançamentos reais existentes.
+            </p>
           </div>
         </div>
-      ) : (
-        <div
-          className={`rounded-2xl p-4 sm:p-5 border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10 transition-all ${
-            estaEquilibrado
-              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-              : 'bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border-indigo-500/30 text-white'
-          }`}
+
+        <button
+          onClick={copiarResumoWhatsApp}
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-200 border border-amber-500/30 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 self-stretch sm:self-center"
         >
-          <div className="flex items-center gap-3.5">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
-                estaEquilibrado
-                  ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
-                  : 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300'
-              }`}
-            >
-              {estaEquilibrado ? '🎉' : '💸'}
-            </div>
-            <div>
-              {estaEquilibrado ? (
-                <>
-                  <h4 className="font-bold text-sm text-emerald-200">
-                    Despesas e Folha em Equilíbrio Perfeito!
-                  </h4>
-                  <p className="text-xs text-emerald-400/80 mt-0.5">
-                    Ambos contribuíram igualmente para as despesas e retenções deste período. Nenhum acerto pendente.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
-                    Balanço da Partilha Conjunta ({formatarMesLabel(periodoFiltro)})
-                  </div>
-                  <h4 className="font-bold text-base text-white mt-0.5">
-                    Diferença líquida de rateio da casa:{' '}
-                    <span className="text-emerald-400 font-mono font-black text-lg">
-                      R$ {formatarBRL(valorAcerto)}
-                    </span>
-                    <span className="text-xs font-normal text-slate-300 block sm:inline sm:ml-2">
-                      ({primeiroNomeVoce}: {pctVoce}% | {primeiroNomeEsposa}: {pctEsposa}%)
-                    </span>
-                  </h4>
-                </>
-              )}
-            </div>
-          </div>
-
-          <button
-            onClick={copiarResumoWhatsApp}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-200 border border-indigo-500/30 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
-          >
-            📋 Copiar Relatório Analítico
-          </button>
-        </div>
-      )}
+          <span>{copiado ? '✓ Copiado!' : '📋 Copiar Prestação de Contas'}</span>
+        </button>
+      </div>
     </div>
   );
 }
