@@ -166,14 +166,15 @@ export default function CadastroTransacao({ usuarioId, onSuccess }: CadastroTran
               onChange={(e) => setCategoria(e.target.value)}
               className="w-full bg-slate-950/40 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
             >
-              <option value="alimentação" className="bg-slate-900">🍔 Alimentação</option>
-              <option value="transporte" className="bg-slate-900">🚗 Transporte</option>
-              <option value="saúde" className="bg-slate-900">💊 Saúde</option>
-              <option value="diversão" className="bg-slate-900">🎮 Diversão</option>
-              <option value="moradia" className="bg-slate-900">🏠 Moradia</option>
-              <option value="educação" className="bg-slate-900">🎓 Educação</option>
-              <option value="compras" className="bg-slate-900">🛍️ Compras</option>
-              <option value="serviços" className="bg-slate-900">🛠️ Serviços/Assinaturas</option>
+              <option value="moradia" className="bg-slate-900">🏠 Moradia (Casa)</option>
+              <option value="alimentação" className="bg-slate-900">🍔 Alimentação (Casa)</option>
+              <option value="saúde" className="bg-slate-900">💊 Saúde / Farmácia (Casa)</option>
+              <option value="serviços" className="bg-slate-900">🛠️ Serviços / Contas (Casa)</option>
+              <option value="transporte" className="bg-slate-900">🚗 Transporte (Casa)</option>
+              <option value="educação" className="bg-slate-900">🎓 Educação (Casa)</option>
+              <option value="pessoal" className="bg-slate-900">👤 Gasto Pessoal (Individual)</option>
+              <option value="diversão" className="bg-slate-900">🎮 Lazer / Diversão</option>
+              <option value="compras" className="bg-slate-900">🛍️ Compras Diversas</option>
               <option value="investimentos" className="bg-slate-900">📈 Investimentos</option>
               <option value="outros" className="bg-slate-900">📦 Outros</option>
             </select>

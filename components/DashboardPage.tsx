@@ -20,6 +20,8 @@ import RelatorioMensal from '@/components/RelatorioMensal';
 import EstudoRecuperacao from '@/components/EstudoRecuperacao';
 import PainelCasalPendente from '@/components/PainelCasalPendente';
 import AcertoContasCasal from '@/components/AcertoContasCasal';
+import ContasFixasRecorrentes from '@/components/ContasFixasRecorrentes';
+import { isGastoCompartilhado } from '@/lib/gastosUtils';
 import toast from 'react-hot-toast';
 
 type Visao = 'casal' | 'voce' | 'esposa';
@@ -39,6 +41,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   const [abaAtiva, setAbaAtiva] = useState<'dashboard' | 'contracheque' | 'dividas' | 'telegram' | 'emprestimos' | 'relatorio'>('dashboard');
   const [contrachequesExpandidos, setContrachequesExpandidos] = useState<Record<string, boolean>>({});
   const [verTodasTransacoes, setVerTodasTransacoes] = useState(false);
+  const [filtroEscopoTransacao, setFiltroEscopoTransacao] = useState<'todos' | 'compartilhado' | 'pessoal_voce' | 'pessoal_esposa'>('todos');
 
   useEffect(() => {
     carregarDados();
@@ -207,13 +210,65 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
   });
 
   // Filtrar gastos conforme a visão
-  const gastosFiltrados = _gastos.filter((g) => {
-    if (visao === 'casal') return true;
-    return g.usuario_id === usuarioAtivo.id;
-  });
+  const gastosFiltrados = useMemo(() => {
+    return _gastos.filter((g) => {
+      if (visao === 'casal') return true;
+      return g.usuario_id === usuarioAtivo.id;
+    });
+  }, [_gastos, visao, usuarioAtivo.id]);
+
+  // Diagnóstico do Impacto Orçamentário da Casa vs Gastos Pessoais
+  const impactoOrcamentario = useMemo(() => {
+    const despesasValidas = gastosFiltrados.filter((g) => {
+      const cat = (g.categoria || '').toLowerCase();
+      return cat !== 'receita_extra' && cat !== 'transferencia';
+    });
+
+    const totalGasto = somarValores(despesasValidas.map((g) => g.valor || 0));
+
+    const despesasCasa = despesasValidas.filter(isGastoCompartilhado);
+    const totalCasa = somarValores(despesasCasa.map((g) => g.valor || 0));
+
+    const despesasPessoalVoce = despesasValidas.filter(
+      (g) => g.usuario_id === usuario.id && !isGastoCompartilhado(g)
+    );
+    const totalPessoalVoce = somarValores(despesasPessoalVoce.map((g) => g.valor || 0));
+
+    const despesasPessoalEsposa = despesasValidas.filter(
+      (g) => usuarioEsposa && g.usuario_id === usuarioEsposa.id && !isGastoCompartilhado(g)
+    );
+    const totalPessoalEsposa = somarValores(despesasPessoalEsposa.map((g) => g.valor || 0));
+
+    const pctCasa = totalGasto > 0 ? Math.round((totalCasa / totalGasto) * 100) : 0;
+    const pctPessoalVoce = totalGasto > 0 ? Math.round((totalPessoalVoce / totalGasto) * 100) : 0;
+    const pctPessoalEsposa = totalGasto > 0 ? Math.round((totalPessoalEsposa / totalGasto) * 100) : 0;
+
+    return {
+      totalGasto,
+      totalCasa,
+      totalPessoalVoce,
+      totalPessoalEsposa,
+      pctCasa,
+      pctPessoalVoce,
+      pctPessoalEsposa,
+      qtdCasa: despesasCasa.length,
+      qtdPessoalVoce: despesasPessoalVoce.length,
+      qtdPessoalEsposa: despesasPessoalEsposa.length,
+    };
+  }, [gastosFiltrados, usuario.id, usuarioEsposa]);
+
+  // Filtragem por Escopo (Todos, Casa, Pessoal Você, Pessoal Esposa)
+  const gastosAposEscopo = useMemo(() => {
+    return gastosFiltrados.filter((g) => {
+      if (filtroEscopoTransacao === 'compartilhado') return isGastoCompartilhado(g);
+      if (filtroEscopoTransacao === 'pessoal_voce') return g.usuario_id === usuario.id && !isGastoCompartilhado(g);
+      if (filtroEscopoTransacao === 'pessoal_esposa') return Boolean(usuarioEsposa && g.usuario_id === usuarioEsposa.id && !isGastoCompartilhado(g));
+      return true;
+    });
+  }, [gastosFiltrados, filtroEscopoTransacao, usuario.id, usuarioEsposa]);
 
   const gastosExibidos = useMemo(() => {
-    if (verTodasTransacoes) return gastosFiltrados;
+    if (verTodasTransacoes || filtroEscopoTransacao !== 'todos') return gastosAposEscopo;
 
     if (visao === 'casal') {
       const ultimosVoce = _gastos.filter(g => g.usuario_id === usuario.id).slice(0, 3);
@@ -228,7 +283,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
         ? _gastos.filter(g => g.usuario_id === usuarioEsposa.id).slice(0, 3) 
         : [];
     }
-  }, [_gastos, gastosFiltrados, visao, verTodasTransacoes, usuario.id, usuarioEsposa]);
+  }, [_gastos, gastosAposEscopo, visao, verTodasTransacoes, filtroEscopoTransacao, usuario.id, usuarioEsposa]);
 
   const totalDescontos = somarValores(descontosMesAtual.map((d: any) => d.valor || 0));
   const comprometimento = calcularComprometimento(totalDescontos, salarioBruto);
@@ -435,6 +490,14 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                 />
               )}
 
+              {/* Contas Fixas Recorrentes e Provisão Futura da Casa - Ativo na visão Casal */}
+              {visao === 'casal' && (
+                <ContasFixasRecorrentes
+                  gastos={_gastos}
+                  mesReferencia={mesVoceStr ? mesVoceStr.substring(0, 7) : undefined}
+                />
+              )}
+
               {/* Seção de Resumos - Grid de Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ResumoCard
@@ -480,13 +543,133 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
               {/* Listagem de Transações do Dia a Dia + Lançamento Manual */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
                 <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md">
-                  <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                    <span>💸</span> Transações Diárias (Telegram e Site)
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <span>💸</span> Transações Diárias (Telegram e Site)
+                    </h3>
+                  </div>
 
-                  {gastosFiltrados.length === 0 ? (
+                  {/* Painel Analítico: Impacto no Orçamento Familiar */}
+                  {visao === 'casal' && (
+                    <div className="mb-6 bg-slate-950/60 border border-white/10 rounded-2xl p-4 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <span>📊</span> Impacto Real no Orçamento Familiar
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">
+                          Total Desembolsado:{' '}
+                          <strong className="text-white">
+                            R$ {impactoOrcamentario.totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </strong>
+                        </span>
+                      </div>
+
+                      {/* Grid de Métricas de Destinação */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                        <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-3">
+                          <div className="flex items-center justify-between text-xs text-emerald-300">
+                            <span className="font-semibold">🏠 Sustentação do Lar</span>
+                            <span className="font-mono font-bold">{impactoOrcamentario.pctCasa}%</span>
+                          </div>
+                          <div className="text-lg font-bold font-mono text-emerald-400 mt-1">
+                            R$ {impactoOrcamentario.totalCasa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                          <div className="text-[10px] text-emerald-400/70 mt-0.5">
+                            {impactoOrcamentario.qtdCasa} despesas essenciais da casa
+                          </div>
+                        </div>
+
+                        <div className="bg-blue-950/30 border border-blue-500/20 rounded-xl p-3">
+                          <div className="flex items-center justify-between text-xs text-blue-300">
+                            <span className="font-semibold">👤 Individual {usuario.nome ? usuario.nome.split(' ')[0] : 'Você'}</span>
+                            <span className="font-mono font-bold">{impactoOrcamentario.pctPessoalVoce}%</span>
+                          </div>
+                          <div className="text-lg font-bold font-mono text-blue-400 mt-1">
+                            R$ {impactoOrcamentario.totalPessoalVoce.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                          <div className="text-[10px] text-blue-400/70 mt-0.5">
+                            {impactoOrcamentario.qtdPessoalVoce} compras pessoais individuais
+                          </div>
+                        </div>
+
+                        <div className="bg-purple-950/30 border border-purple-500/20 rounded-xl p-3">
+                          <div className="flex items-center justify-between text-xs text-purple-300">
+                            <span className="font-semibold">👤 Individual {usuarioEsposa?.nome ? usuarioEsposa.nome.split(' ')[0] : 'Esposa'}</span>
+                            <span className="font-mono font-bold">{impactoOrcamentario.pctPessoalEsposa}%</span>
+                          </div>
+                          <div className="text-lg font-bold font-mono text-purple-400 mt-1">
+                            R$ {impactoOrcamentario.totalPessoalEsposa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                          <div className="text-[10px] text-purple-400/70 mt-0.5">
+                            {impactoOrcamentario.qtdPessoalEsposa} compras pessoais individuais
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Barra comparativa de impacto */}
+                      <div className="space-y-1 pt-1">
+                        <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden flex border border-white/5">
+                          <div style={{ width: `${impactoOrcamentario.pctCasa}%` }} className="bg-emerald-500 h-full" title={`Casa: ${impactoOrcamentario.pctCasa}%`} />
+                          <div style={{ width: `${impactoOrcamentario.pctPessoalVoce}%` }} className="bg-blue-500 h-full" title={`Pessoal Você: ${impactoOrcamentario.pctPessoalVoce}%`} />
+                          <div style={{ width: `${impactoOrcamentario.pctPessoalEsposa}%` }} className="bg-purple-500 h-full" title={`Pessoal Esposa: ${impactoOrcamentario.pctPessoalEsposa}%`} />
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-tight">
+                          💡 <strong className="text-emerald-300">{impactoOrcamentario.pctCasa}%</strong> das despesas mantêm a família e <strong className="text-slate-200">{impactoOrcamentario.pctPessoalVoce + impactoOrcamentario.pctPessoalEsposa}%</strong> são despesas pessoais isoladas.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Filtro Rápido por Escopo */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-5 pb-3 border-b border-white/5">
+                    <span className="text-xs text-slate-400 mr-1 font-semibold">Filtrar:</span>
+                    <button
+                      onClick={() => setFiltroEscopoTransacao('todos')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        filtroEscopoTransacao === 'todos'
+                          ? 'bg-white text-slate-950 font-bold shadow'
+                          : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      Todos ({gastosFiltrados.length})
+                    </button>
+                    <button
+                      onClick={() => setFiltroEscopoTransacao('compartilhado')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                        filtroEscopoTransacao === 'compartilhado'
+                          ? 'bg-emerald-500 text-slate-950 font-bold shadow'
+                          : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/20'
+                      }`}
+                    >
+                      <span>🏠</span> Gastos da Casa ({impactoOrcamentario.qtdCasa})
+                    </button>
+                    <button
+                      onClick={() => setFiltroEscopoTransacao('pessoal_voce')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                        filtroEscopoTransacao === 'pessoal_voce'
+                          ? 'bg-blue-500 text-slate-950 font-bold shadow'
+                          : 'bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 border border-blue-500/20'
+                      }`}
+                    >
+                      <span>👤</span> Pessoal {usuario.nome ? usuario.nome.split(' ')[0] : 'Você'} ({impactoOrcamentario.qtdPessoalVoce})
+                    </button>
+                    {usuarioEsposa && (
+                      <button
+                        onClick={() => setFiltroEscopoTransacao('pessoal_esposa')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                          filtroEscopoTransacao === 'pessoal_esposa'
+                            ? 'bg-purple-500 text-slate-950 font-bold shadow'
+                            : 'bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 border border-purple-500/20'
+                        }`}
+                      >
+                        <span>👤</span> Pessoal {usuarioEsposa.nome ? usuarioEsposa.nome.split(' ')[0] : 'Esposa'} ({impactoOrcamentario.qtdPessoalEsposa})
+                      </button>
+                    )}
+                  </div>
+
+                  {gastosExibidos.length === 0 ? (
                     <div className="text-center py-8 text-slate-400">
-                      Nenhuma transação registrada para esta visão.
+                      Nenhuma transação encontrada com os filtros selecionados.
                     </div>
                   ) : (
                     <>
@@ -497,6 +680,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                             <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase tracking-wider">
                               <th className="pb-3 pr-4">Descrição / Estabelecimento</th>
                               <th className="pb-3 pr-4">Categoria</th>
+                              <th className="pb-3 pr-4">Escopo</th>
                               <th className="pb-3 pr-4">Valor</th>
                               <th className="pb-3 pr-4">Data</th>
                               <th className="pb-3 pr-4">Quem gastou</th>
@@ -511,6 +695,7 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                               
                               const isReceita = g.categoria === 'receita_extra';
                               const isTransf = g.categoria === 'transferencia';
+                              const isCompartilhado = isGastoCompartilhado(g);
 
                               return (
                                 <tr key={g.id} className="hover:bg-white/5 transition-colors">
@@ -521,19 +706,31 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                       onChange={(e) => alterarCategoriaGasto(g.id, e.target.value)}
                                       className="bg-slate-900/90 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer font-medium"
                                     >
-                                      <option value="alimentação" className="bg-slate-950">🍔 Alimentação</option>
-                                      <option value="transporte" className="bg-slate-950">🚗 Transporte</option>
-                                      <option value="saúde" className="bg-slate-950">💊 Saúde</option>
-                                      <option value="diversão" className="bg-slate-950">🎮 Diversão</option>
-                                      <option value="moradia" className="bg-slate-950">🏠 Moradia</option>
-                                      <option value="educação" className="bg-slate-950">🎓 Educação</option>
-                                      <option value="compras" className="bg-slate-950">🛍️ Compras</option>
-                                      <option value="serviços" className="bg-slate-950">🛠️ Serviços/Assinaturas</option>
+                                      <option value="moradia" className="bg-slate-950">🏠 Moradia (Casa)</option>
+                                      <option value="alimentação" className="bg-slate-950">🍔 Alimentação (Casa)</option>
+                                      <option value="saúde" className="bg-slate-950">💊 Saúde / Farmácia (Casa)</option>
+                                      <option value="serviços" className="bg-slate-950">🛠️ Serviços / Contas (Casa)</option>
+                                      <option value="transporte" className="bg-slate-950">🚗 Transporte (Casa)</option>
+                                      <option value="educação" className="bg-slate-950">🎓 Educação (Casa)</option>
+                                      <option value="pessoal" className="bg-slate-950">👤 Gasto Pessoal (Individual)</option>
+                                      <option value="diversão" className="bg-slate-950">🎮 Lazer / Diversão</option>
+                                      <option value="compras" className="bg-slate-950">🛍️ Compras Diversas</option>
                                       <option value="investimentos" className="bg-slate-950">📈 Investimentos</option>
                                       <option value="receita_extra" className="bg-slate-950">💰 Receita Extra</option>
                                       <option value="transferencia" className="bg-slate-950">🔄 Transferência</option>
                                       <option value="outros" className="bg-slate-950">📦 Outros</option>
                                     </select>
+                                  </td>
+                                  <td className="py-3.5 pr-4">
+                                    {isCompartilhado ? (
+                                      <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap inline-flex items-center gap-1">
+                                        <span>🏠</span> Casa
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap inline-flex items-center gap-1">
+                                        <span>👤</span> Pessoal
+                                      </span>
+                                    )}
                                   </td>
                                   <td className={`py-3.5 pr-4 font-bold ${
                                     isReceita 
@@ -615,16 +812,28 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                 </span>
                               </div>
 
-                              {/* Badges de Quem Gastou e Status */}
+                              {/* Badges de Quem Gastou, Escopo e Status */}
                               <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/5">
-                                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 ${
-                                  g.usuario_id === usuario.id 
-                                    ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30' 
-                                    : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
-                                }`}>
-                                  <span>{g.usuario_id === usuario.id ? '👤' : '👩'}</span>
-                                  <span>{dono}</span>
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 ${
+                                    g.usuario_id === usuario.id 
+                                      ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30' 
+                                      : 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                                  }`}>
+                                    <span>{g.usuario_id === usuario.id ? '👤' : '👩'}</span>
+                                    <span>{dono}</span>
+                                  </span>
+
+                                  {isGastoCompartilhado(g) ? (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap inline-flex items-center gap-1">
+                                      <span>🏠</span> Casa
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap inline-flex items-center gap-1">
+                                      <span>👤</span> Pessoal
+                                    </span>
+                                  )}
+                                </div>
 
                                 <div className="flex items-center gap-2">
                                   {g.confirmado ? (
@@ -651,14 +860,15 @@ export default function DashboardPage({ usuario }: DashboardPageProps) {
                                     onChange={(e) => alterarCategoriaGasto(g.id, e.target.value)}
                                     className="w-full bg-slate-950/80 border border-white/15 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer font-medium min-h-[42px]"
                                   >
-                                    <option value="alimentação">🍔 Alimentação</option>
-                                    <option value="transporte">🚗 Transporte</option>
-                                    <option value="saúde">💊 Saúde</option>
-                                    <option value="diversão">🎮 Diversão</option>
-                                    <option value="moradia">🏠 Moradia</option>
-                                    <option value="educação">🎓 Educação</option>
-                                    <option value="compras">🛍️ Compras</option>
-                                    <option value="serviços">🛠️ Assinaturas</option>
+                                    <option value="moradia">🏠 Moradia (Casa)</option>
+                                    <option value="alimentação">🍔 Alimentação (Casa)</option>
+                                    <option value="saúde">💊 Saúde / Farmácia (Casa)</option>
+                                    <option value="serviços">🛠️ Serviços / Contas (Casa)</option>
+                                    <option value="transporte">🚗 Transporte (Casa)</option>
+                                    <option value="educação">🎓 Educação (Casa)</option>
+                                    <option value="pessoal">👤 Gasto Pessoal (Individual)</option>
+                                    <option value="diversão">🎮 Lazer / Diversão</option>
+                                    <option value="compras">🛍️ Compras Diversas</option>
                                     <option value="investimentos">📈 Investimentos</option>
                                     <option value="receita_extra">💰 Receita Extra</option>
                                     <option value="transferencia">🔄 Transferência</option>

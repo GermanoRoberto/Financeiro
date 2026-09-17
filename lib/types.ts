@@ -50,5 +50,16 @@ export type GastoDiario = {
   data: string;
   origem: string;
   confirmado: boolean;
+  escopo?: 'casal' | 'pessoal';
   criado_em: string;
+};
+
+export type ContaFixa = {
+  id: string;
+  nome: string;
+  categoria: string;
+  valorEstimado: number;
+  diaVencimento: number;
+  usuario_id?: string | null;
+  recorrente: boolean;
 };

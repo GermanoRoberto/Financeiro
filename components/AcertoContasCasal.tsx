@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { GastoDiario, Usuario, Contracheque, Desconto } from '@/lib/types';
 import { formatarBRL, somarValores } from '@/lib/money';
+import { isGastoCompartilhado } from '@/lib/gastosUtils';
 import toast from 'react-hot-toast';
 
 interface AcertoContasCasalProps {
@@ -125,8 +126,13 @@ export default function AcertoContasCasal({
   }, [descontos, ccMap, periodoFiltro, usuario.id, usuarioEsposa]);
 
   // 2. GASTOS DIÁRIOS (Extratos e contas correntes) do período
-  const { totalGastosVoce, totalGastosEsposa } = useMemo(() => {
-    const despesasCasal = gastos.filter((g) => {
+  const {
+    totalCompartilhadoVoce,
+    totalCompartilhadoEsposa,
+    totalPessoalVoce,
+    totalPessoalEsposa,
+  } = useMemo(() => {
+    const despesasPeriodo = gastos.filter((g) => {
       const cat = (g.categoria || '').toLowerCase();
       if (cat === 'receita_extra' || cat === 'transferencia') return false;
 
@@ -137,18 +143,26 @@ export default function AcertoContasCasal({
       return true;
     });
 
-    const gVoce = despesasCasal.filter((g) => g.usuario_id === usuario.id);
-    const gEsposa = usuarioEsposa ? despesasCasal.filter((g) => g.usuario_id === usuarioEsposa.id) : [];
+    const gVoce = despesasPeriodo.filter((g) => g.usuario_id === usuario.id);
+    const gEsposa = usuarioEsposa ? despesasPeriodo.filter((g) => g.usuario_id === usuarioEsposa.id) : [];
+
+    const compVoce = gVoce.filter(isGastoCompartilhado);
+    const compEsposa = gEsposa.filter(isGastoCompartilhado);
+
+    const pessVoce = gVoce.filter((g) => !isGastoCompartilhado(g));
+    const pessEsposa = gEsposa.filter((g) => !isGastoCompartilhado(g));
 
     return {
-      totalGastosVoce: somarValores(gVoce.map((g) => g.valor || 0)),
-      totalGastosEsposa: somarValores(gEsposa.map((g) => g.valor || 0)),
+      totalCompartilhadoVoce: somarValores(compVoce.map((g) => g.valor || 0)),
+      totalCompartilhadoEsposa: somarValores(compEsposa.map((g) => g.valor || 0)),
+      totalPessoalVoce: somarValores(pessVoce.map((g) => g.valor || 0)),
+      totalPessoalEsposa: somarValores(pessEsposa.map((g) => g.valor || 0)),
     };
   }, [gastos, periodoFiltro, usuario.id, usuarioEsposa]);
 
-  // 3. DESEMBOLSO TOTAL INTEGRADO (Folha + Diário)
-  const totalVoce = totalFolhaVoce + totalGastosVoce;
-  const totalEsposa = totalFolhaEsposa + totalGastosEsposa;
+  // 3. DESEMBOLSO COMPARTILHADO (O que entra no rateio 50/50: Folha + Despesas da Casa)
+  const totalVoce = totalFolhaVoce + totalCompartilhadoVoce;
+  const totalEsposa = totalFolhaEsposa + totalCompartilhadoEsposa;
   const totalGeral = totalVoce + totalEsposa;
   const cotaPorPessoa = totalGeral / 2;
 
@@ -156,8 +170,6 @@ export default function AcertoContasCasal({
   const diferenca = totalVoce - totalEsposa;
   const valorAcerto = Math.abs(diferenca) / 2;
 
-  const quemPaga = diferenca > 0 ? primeiroNomeEsposa : primeiroNomeVoce;
-  const quemRecebe = diferenca > 0 ? primeiroNomeVoce : primeiroNomeEsposa;
   const estaEquilibrado = Math.round(valorAcerto * 100) === 0;
 
   // Porcentagens
@@ -175,24 +187,30 @@ export default function AcertoContasCasal({
     const nomeMes = formatarMesLabel(periodoFiltro);
 
     let texto = `🧾 *Fechamento Financeiro Integrado do Casal - ${nomeMes}*\n\n`;
-    texto += `💸 *Total Geral de Desembolsos:* R$ ${formatarBRL(totalGeral)}\n\n`;
-    texto += `• *${primeiroNomeVoce}* bancou: R$ ${formatarBRL(totalVoce)} (${pctVoce}%)\n`;
+    texto += `💸 *Total Compartilhado da Casa:* R$ ${formatarBRL(totalGeral)}\n\n`;
+    texto += `• *${primeiroNomeVoce}* bancou para a casa: R$ ${formatarBRL(totalVoce)} (${pctVoce}%)\n`;
     texto += `  - Retido em folha (consignados/saúde): R$ ${formatarBRL(totalFolhaVoce)}\n`;
-    texto += `  - Contas e cartões do dia a dia: R$ ${formatarBRL(totalGastosVoce)}\n\n`;
-    texto += `• *${primeiroNomeEsposa}* bancou: R$ ${formatarBRL(totalEsposa)} (${pctEsposa}%)\n`;
+    texto += `  - Despesas da casa (cartões/contas): R$ ${formatarBRL(totalCompartilhadoVoce)}\n`;
+    if (totalPessoalVoce > 0) {
+      texto += `  - (Compras pessoais individuais: R$ ${formatarBRL(totalPessoalVoce)})\n`;
+    }
+    texto += `\n• *${primeiroNomeEsposa}* bancou para a casa: R$ ${formatarBRL(totalEsposa)} (${pctEsposa}%)\n`;
     texto += `  - Retido em folha (consignados/saúde): R$ ${formatarBRL(totalFolhaEsposa)}\n`;
-    texto += `  - Contas e cartões do dia a dia: R$ ${formatarBRL(totalGastosEsposa)}\n\n`;
-    texto += `⚖️ *Cota justa 50/50:* R$ ${formatarBRL(cotaPorPessoa)} para cada\n\n`;
+    texto += `  - Despesas da casa (cartões/contas): R$ ${formatarBRL(totalCompartilhadoEsposa)}\n`;
+    if (totalPessoalEsposa > 0) {
+      texto += `  - (Compras pessoais individuais: R$ ${formatarBRL(totalPessoalEsposa)})\n`;
+    }
+    texto += `\n⚖️ *Cota de referência 50/50 da casa:* R$ ${formatarBRL(cotaPorPessoa)} para cada\n\n`;
 
     if (estaEquilibrado) {
-      texto += `✨ *Contas perfeitamente empatadas! Ninguém deve nada a ninguém.* 🎉`;
+      texto += `✨ *Contas da casa em equilíbrio!* 🎉`;
     } else {
-      texto += `👉 *Acerto:* ${quemPaga} transfere *R$ ${formatarBRL(valorAcerto)}* para ${quemRecebe} via Pix para empatar 50/50.`;
+      texto += `📊 *Balanço das Despesas Conjuntas:* Diferença de R$ ${formatarBRL(valorAcerto)} na partilha (${pctVoce}% ${primeiroNomeVoce} / ${pctEsposa}% ${primeiroNomeEsposa}).`;
     }
 
     navigator.clipboard.writeText(texto);
     setCopiado(true);
-    toast.success('Resumo copiado para a área de transferência!');
+    toast.success('Relatório analítico copiado com sucesso!');
     setTimeout(() => setCopiado(false), 3000);
   };
 
@@ -212,11 +230,11 @@ export default function AcertoContasCasal({
             <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
               Acerto Financeiro Integrado do Casal
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Folha + Extratos (50/50)
+                Folha + Despesas da Casa (50/50)
               </span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Consolida retenções em folha (consignados e saúde) e gastos diários de ambos
+              Consolida retenções em folha e despesas essenciais compartilhadas (exclui compras pessoais exclusivas)
             </p>
           </div>
         </div>
@@ -271,7 +289,7 @@ export default function AcertoContasCasal({
             R$ {formatarBRL(totalVoce)}
           </div>
 
-          {/* Subtotais Transparentes: Folha vs Cartão */}
+          {/* Subtotais Transparentes: Folha vs Casa vs Pessoal */}
           <div className="pt-2 border-t border-white/5 space-y-1 text-xs">
             <div className="flex justify-between items-center text-slate-300">
               <span className="text-slate-400">📄 Retido em Folha:</span>
@@ -280,11 +298,19 @@ export default function AcertoContasCasal({
               </span>
             </div>
             <div className="flex justify-between items-center text-slate-300">
-              <span className="text-slate-400">💳 Contas & Cartões:</span>
+              <span className="text-slate-400">🏠 Despesas da Casa:</span>
               <span className="font-mono font-semibold text-blue-300">
-                R$ {formatarBRL(totalGastosVoce)}
+                R$ {formatarBRL(totalCompartilhadoVoce)}
               </span>
             </div>
+            {totalPessoalVoce > 0 && (
+              <div className="flex justify-between items-center text-slate-400 text-[11px] pt-0.5 border-t border-white/5">
+                <span className="text-slate-500">👤 Pessoal (individual):</span>
+                <span className="font-mono text-slate-400">
+                  R$ {formatarBRL(totalPessoalVoce)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -302,7 +328,7 @@ export default function AcertoContasCasal({
             R$ {formatarBRL(totalEsposa)}
           </div>
 
-          {/* Subtotais Transparentes: Folha vs Cartão */}
+          {/* Subtotais Transparentes: Folha vs Casa vs Pessoal */}
           <div className="pt-2 border-t border-white/5 space-y-1 text-xs">
             <div className="flex justify-between items-center text-slate-300">
               <span className="text-slate-400">📄 Retida em Folha:</span>
@@ -311,11 +337,19 @@ export default function AcertoContasCasal({
               </span>
             </div>
             <div className="flex justify-between items-center text-slate-300">
-              <span className="text-slate-400">💳 Contas & Cartões:</span>
+              <span className="text-slate-400">🏠 Despesas da Casa:</span>
               <span className="font-mono font-semibold text-purple-300">
-                R$ {formatarBRL(totalGastosEsposa)}
+                R$ {formatarBRL(totalCompartilhadoEsposa)}
               </span>
             </div>
+            {totalPessoalEsposa > 0 && (
+              <div className="flex justify-between items-center text-slate-400 text-[11px] pt-0.5 border-t border-white/5">
+                <span className="text-slate-500">👤 Pessoal (individual):</span>
+                <span className="font-mono text-slate-400">
+                  R$ {formatarBRL(totalPessoalEsposa)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -417,28 +451,28 @@ export default function AcertoContasCasal({
               ) : (
                 <>
                   <div className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
-                    Ajuste Sugerido para Fechar 50/50 ({formatarMesLabel(periodoFiltro)})
+                    Balanço da Partilha Conjunta ({formatarMesLabel(periodoFiltro)})
                   </div>
                   <h4 className="font-bold text-base text-white mt-0.5">
-                    <span className="text-indigo-400 font-extrabold">{quemPaga}</span> deve transferir{' '}
+                    Diferença líquida de rateio da casa:{' '}
                     <span className="text-emerald-400 font-mono font-black text-lg">
                       R$ {formatarBRL(valorAcerto)}
-                    </span>{' '}
-                    para <span className="text-purple-400 font-extrabold">{quemRecebe}</span>
+                    </span>
+                    <span className="text-xs font-normal text-slate-300 block sm:inline sm:ml-2">
+                      ({primeiroNomeVoce}: {pctVoce}% | {primeiroNomeEsposa}: {pctEsposa}%)
+                    </span>
                   </h4>
                 </>
               )}
             </div>
           </div>
 
-          {!estaEquilibrado && (
-            <button
-              onClick={copiarResumoWhatsApp}
-              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer whitespace-nowrap"
-            >
-              Enviar Acerto Completo
-            </button>
-          )}
+          <button
+            onClick={copiarResumoWhatsApp}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-200 border border-indigo-500/30 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-2"
+          >
+            📋 Copiar Relatório Analítico
+          </button>
         </div>
       )}
     </div>
